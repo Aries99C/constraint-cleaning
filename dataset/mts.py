@@ -1,5 +1,6 @@
 import pandas as pd
 
+from constraints.acc.acc_constraint import mining_acc_constraints
 from utils import project_root
 from dataset import DATASETS
 from constraints.speed.speed_constraint import mining_speed_constraints
@@ -38,6 +39,7 @@ class MTS(object):
         self.isDirty = None             # 记录注入错误的单元格
 
         self.speed_constraints = None   # 速度约束
+        self.acc_constraints = None     # 加速度约束
 
         assert dataset in DATASETS.keys()   # 保证使用了预设的数据集，请在__init__.py文件中配置
 
@@ -73,7 +75,12 @@ class MTS(object):
         else:           # 否则需要挖掘规则
             # 挖掘速度约束
             self.speed_constraints = mining_speed_constraints(self, alpha=3, verbose=verbose)
+            # 挖掘加速度约束
+            self.acc_constraints = mining_acc_constraints(self, alpha=3, verbose=verbose)
+            # 挖掘方差约束
+            # TODO
             # 挖掘复杂规则
+            # TODO
             if mining_method == 'stcd':     # 默认挖掘时窗约束
                 pass
             elif mining_method == 'crr':    # 也支持挖掘crr
