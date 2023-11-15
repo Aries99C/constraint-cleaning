@@ -1,10 +1,15 @@
+import numpy as np
 import pandas as pd
 
-from constraints.acc.acc_constraint import mining_acc_constraints
 from utils import project_root
 from dataset import DATASETS
-from constraints.speed.speed_constraint import mining_speed_constraints
+from constraints.speed.mining import mining_speed_constraints
+from constraints.acc.mining import mining_acc_constraints
+from constraints.stcd.mining import mining_stcd
 
+pd.set_option('display.max_rows', 20)
+pd.set_option('display.max_columns', 100)
+pd.set_option('display.width', 2000)
 
 PROJECT_ROOT = project_root()
 
@@ -40,6 +45,7 @@ class MTS(object):
 
         self.speed_constraints = None   # 速度约束
         self.acc_constraints = None     # 加速度约束
+        self.stcds = None               # 时窗约束
 
         assert dataset in DATASETS.keys()   # 保证使用了预设的数据集，请在__init__.py文件中配置
 
@@ -60,33 +66,32 @@ class MTS(object):
         self.clean = self.clean[0: self.len]        # 截取预设长度的数据
 
         if verbose > 0:         # 日志显示，2级比1级更详细
-            print('{:=^80}'.format(' Load Dataset {} '.format(self.dataset.upper())))
-            print('dataset len: ' + str(self.len))
-            print('dataset dim: ' + str(self.dim))
+            print('{:=^80}'.format(' 加载数据集{} '.format(self.dataset.upper())))
+            print('数据集长度: ' + str(self.len))
+            print('数据集维数: ' + str(self.dim))
             if verbose == 2:    # 显示数据集概览
-                pd.set_option('display.max_rows', 20)
-                pd.set_option('display.max_columns', 100)
-                pd.set_option('display.width', 2000)
                 print(self.clean)
 
-    def constraints_mining(self, pre_mined=False, mining_method='stcd', verbose=0):
+    def constraints_mining(self, pre_mined=False, mining_constraints=None, verbose=0):
+        if mining_constraints is None:
+            mining_constraints = ['speed', 'acc', 'stcd']   # 默认挖掘的约束
         if pre_mined:   # 使用预先挖掘好的规则，直接读取即可
             pass
         else:           # 否则需要挖掘规则
-            # 挖掘速度约束
-            self.speed_constraints = mining_speed_constraints(self, alpha=3, verbose=verbose)
-            # 挖掘加速度约束
-            self.acc_constraints = mining_acc_constraints(self, alpha=3, verbose=verbose)
-            # 挖掘方差约束
-            # TODO
-            # 挖掘复杂规则
-            # TODO
-            if mining_method == 'stcd':     # 默认挖掘时窗约束
+            if 'speed' in mining_constraints:   # 支持速度约束
+                self.speed_constraints = mining_speed_constraints(self, alpha=3, verbose=verbose)
+            if 'acc' in mining_constraints:     # 支持加速度约束
+                self.acc_constraints = mining_acc_constraints(self, alpha=3, verbose=verbose)
+            if 'stcd' in mining_constraints:    # 支持时窗约束
+                self.stcds = mining_stcd(self, verbose=verbose)
+            if 'crr' in mining_constraints:     # 支持crr
                 pass
-            elif mining_method == 'crr':    # 也支持挖掘crr
+            if 'rfd' in mining_constraints:     # 支持rfd
                 pass
-            else:
-                raise Exception('不支持挖掘的规则类型')
+
+    def clean2array(self):
+        d = self.clean.copy(deep=True)      # 拷贝正确值
+        return d.values                     # 将Dataframe转换为ndarray类型
 
 
 if __name__ == '__main__':

@@ -1,8 +1,8 @@
 import numpy as np
 import matplotlib
+import matplotlib.pyplot as plt
 
 matplotlib.use('TkAgg')
-import matplotlib.pyplot as plt
 
 
 def mining_speed_constraints(mts, alpha=3, verbose=0):
@@ -27,7 +27,7 @@ def mining_speed_constraints(mts, alpha=3, verbose=0):
             speed_hist[col] = speeds
 
     if verbose > 0:  # 输出速度约束的形式
-        print('{:=^80}'.format(' Mining Speed Constraints On {} '.format(mts.dataset.upper())))
+        print('{:=^80}'.format(' 在数据集{}上挖掘速度约束 '.format(mts.dataset.upper())))
         for item in speed_constraints.items():
             print('{:.2f} <= s({}) <= {:.2f}'.format(item[1][0], item[0], item[1][1]))
             if verbose == 2:  # 额外绘制速度直方图

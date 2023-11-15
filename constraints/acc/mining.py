@@ -1,8 +1,8 @@
 import numpy as np
 import matplotlib
+import matplotlib.pyplot as plt
 
 matplotlib.use('TkAgg')
-import matplotlib.pyplot as plt
 
 
 def mining_acc_constraints(mts, alpha=3, verbose=0):
@@ -28,7 +28,7 @@ def mining_acc_constraints(mts, alpha=3, verbose=0):
             acc_hist[col] = accs
 
     if verbose > 0:  # 输出加速度约束的形式
-        print('{:=^80}'.format(' Mining Acc Constraints On {} '.format(mts.dataset.upper())))
+        print('{:=^80}'.format(' 在数据集{}上挖掘加速度约束 '.format(mts.dataset.upper())))
         for item in acc_constraints.items():
             print('{:.2f} <= a({}) <= {:.2f}'.format(item[1][0], item[0], item[1][1]))
             if verbose == 2:  # 额外绘制速度直方图
