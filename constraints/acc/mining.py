@@ -36,3 +36,4 @@ def mining_acc_constraints(mts, alpha=3, verbose=0):
                 plt.hist(acc_hist[item[0]])
                 plt.show()
 
+    return acc_constraints
