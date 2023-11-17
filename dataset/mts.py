@@ -12,7 +12,7 @@ from constraints.speed.mining import mining_speed_constraints
 from constraints.acc.mining import mining_acc_constraints
 from constraints.stcd.mining import mining_stcd
 
-from cleaning.benchmark import delta_modified_clean, speed_local, speed_global, acc_local
+from cleaning.benchmark import delta, raa, speed_local, speed_global, acc_local, acc_global, IMR, ewma, median_filter, func_lp
 
 pd.set_option('display.max_rows', 20)
 pd.set_option('display.max_columns', 100)
@@ -80,7 +80,7 @@ class MTS(object):
             if verbose == 2:    # 显示数据集概览
                 print(self.clean)
 
-    def constraints_mining(self, pre_mined=False, mining_constraints=None, verbose=0):
+    def constraints_mining(self, pre_mined=False, mining_constraints=None, w=2, verbose=0):
         """
         根据多元时序数据的正确值挖掘规则，包括行约束和列约束
         :param pre_mined: 预挖掘标记，为True时直接读取已挖掘的约束
@@ -130,7 +130,7 @@ class MTS(object):
                 with open(PROJECT_ROOT + '/constraints/rules/{}_acc.txt'.format(self.dataset), 'wb') as f:
                     pickle.dump(self.acc_constraints, f)  # pickle序列化加速度约束
             if 'stcd' in self.mining_constraints:   # 支持时窗约束
-                self.stcds = mining_stcd(self, verbose=verbose)
+                self.stcds = mining_stcd(self, win_size=w, verbose=verbose)
                 with open(PROJECT_ROOT + '/constraints/rules/{}_stcd.txt'.format(self.dataset), 'wb') as f:
                     pickle.dump(self.stcds, f)  # pickle序列化时窗约束
             if 'crr' in self.mining_constraints:    # 支持crr
@@ -142,7 +142,11 @@ class MTS(object):
         d = self.clean.copy(deep=True)      # 拷贝正确值
         return d.values                     # 将Dataframe转换为ndarray类型
 
-    def insert_error(self, ratio=0.1, snr=10, verbose=0):
+    def modified2array(self):
+        d = self.modified.copy(deep=True)   # 拷贝值
+        return d.values                     # 将Dataframe转换为ndarray类型
+
+    def insert_error(self, ratio=0.1, label_ratio=0.1, snr=10, verbose=0):
         # 拷贝正确值作为观测值
         self.origin = self.clean.copy(deep=True)
 
@@ -151,10 +155,16 @@ class MTS(object):
         for col in self.isDirty.columns:
             self.isDirty[col] = False       # 全部初始化为False
 
+        label_cnt = 0
         # 初始化IMR算法所使用的标签
         self.isLabel = self.origin.copy(deep=True)
         for col in self.isLabel.columns:
             self.isLabel[col] = False       # 全部初始化为False
+            while self.isLabel[col].values.tolist().count(True) < int(self.len * label_ratio):  # 以固定比例随机生成标签
+                random_label_pos = random.randint(0, self.len - 1)
+                if not self.isLabel[col].values[random_label_pos]:
+                    self.isLabel[col].values[random_label_pos] = True
+                    label_cnt += 1
         self.isLabel[:5] = True             # 为IMR算法提供最基础的标签
 
         # 向观测值注入错误
@@ -184,9 +194,6 @@ class MTS(object):
                 error_size -= insert_len                                                # 更新错误数量
                 insert_size += insert_len                                               # 记录注入错误数量
                 self.isDirty[attr].values[insert_pos: insert_pos + insert_len] = True   # 更新记录错误的单元格
-                while self.isLabel[attr].values[insert_pos: insert_pos + insert_len].tolist().count(False) < 5:
-                    random_pos = random.randint(insert_pos, insert_pos + insert_len)
-                    self.isLabel[attr].values[random_pos] = True                        # 随机提供5个标签
 
         # 拷贝待修复值，后续将在待修复值上进行修改
         self.modified = self.origin.copy(deep=True)
@@ -201,9 +208,10 @@ class MTS(object):
 
         print('{:=^80}'.format(' 向数据集{}注入错误 '.format(self.dataset.upper())))
         print('共计注入错误单元格数: {}'.format(insert_size))
+        print('共计提供标签数：{}'.format(label_cnt))
         if verbose > 0:     # 日志显示
-            print('正确值和观测值的总误差: {}'.format(round(error_sum, 2)))
-            print('注入错误的平均误差: {}'.format(round(error_aver, 2)))
+            # print('正确值和观测值的总误差: {:.3f}'.format(error_sum))
+            print('注入错误的平均误差: {:.3f}'.format(error_aver))
             if verbose == 2:
                 self.modified.plot(subplots=True, figsize=(20, 40))
                 plt.show()
@@ -220,36 +228,68 @@ class MTS(object):
 
 
 if __name__ == '__main__':
+    # 实验参数
+    w = 2
+
     idf = MTS('idf', 'timestamp', True, size=5000, verbose=1)                   # 读取数据集
-    # idf.constraints_mining(verbose=1)
-    idf.constraints_mining(pre_mined=True, verbose=0)                           # 配置约束集合
-    insert_size, error_sum, error_aver = idf.insert_error(snr=15, verbose=1)    # 注入噪声
+    idf.constraints_mining(w=w, verbose=1)                                      # 挖掘约束
+    # idf.constraints_mining(pre_mined=True, verbose=0)                           # 预配置约束集合
+    idf.insert_error(snr=15, verbose=1)                                         # 注入噪声
 
     # 速度约束Local修复
     # speed_local_modified, speed_local_is_modified, speed_local_time = speed_local(idf)
     # print('{:=^80}'.format(' 局部速度约束修复数据集{} '.format(idf.dataset.upper())))
-    # speed_local_error = delta_modified_clean(speed_local_modified, idf.clean)
-    # print('修复用时: {}ms'.format(round(speed_local_time, 3)))
-    # print('修复值与正确值总误差: {}'.format(round(speed_local_error, 2)))
-    # print('修复值与正确值平均误差: {}'.format(round(speed_local_error / (idf.len * idf.dim)), 2))
+    # print('修复用时: {:.4g}ms'.format(speed_local_time))
+    # print('修复值与正确值平均误差: {:.4g}'.format(delta(speed_local_modified, idf.clean)))
+    # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, speed_local_modified)))
 
     # 速度约束Global修复
     # speed_global_modified, speed_global_is_modified, speed_global_time = speed_global(idf)
     # print('{:=^80}'.format(' 全局速度约束修复数据集{} '.format(idf.dataset.upper())))
-    # speed_global_error = delta_modified_clean(speed_global_modified, idf.clean)
-    # print('修复用时: {}ms'.format(round(speed_global_time, 3)))
-    # print('修复值与正确值总误差: {}'.format(round(speed_global_error, 2)))
-    # print('修复值与正确值平均误差: {}'.format(round(speed_global_error / (idf.len * idf.dim)), 2))
+    # print('修复用时: {:.4g}ms'.format(speed_global_time))
+    # print('修复值与正确值平均误差: {:.4g}'.format(delta(speed_global_modified, idf.clean)))
+    # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, speed_global_modified)))
 
     # 速度约束+加速度约束Local修复
-    acc_local_modified, acc_local_is_modified, acc_local_time = acc_local(idf)
-    print('{:=^80}'.format(' 局部速度约束+加速度约束修复数据集{} '.format(idf.dataset.upper())))
-    acc_local_error = delta_modified_clean(acc_local_modified, idf.clean)
-    print('修复用时: {}ms'.format(round(acc_local_time, 3)))
-    print('修复值与正确值总误差: {}'.format(round(acc_local_error, 2)))
-    print('修复值与正确值平均误差: {}'.format(round(acc_local_error / (idf.len * idf.dim)), 2))
-    idf.clean.plot(subplots=True, figsize=(20, 20))
-    idf.origin.plot(subplots=True, figsize=(20, 20))
-    acc_local_modified.plot(subplots=True, figsize=(20, 20))
-    plt.show()
+    # acc_local_modified, acc_local_is_modified, acc_local_time = acc_local(idf)
+    # print('{:=^80}'.format(' 局部速度约束+加速度约束修复数据集{} '.format(idf.dataset.upper())))
+    # print('修复用时: {:.4g}ms'.format(acc_local_time))
+    # print('修复值与正确值平均误差: {:.4g}'.format(delta(acc_local_modified, idf.clean)))
+    # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, acc_local_modified)))
+
+    # 速度约束+加速度约束Global修复
+    # acc_global_modified, acc_global_is_modified, acc_global_time = acc_global(idf)
+    # print('{:=^80}'.format(' 全局速度约束+加速度约束修复数据集{} '.format(idf.dataset.upper())))
+    # print('修复用时: {:.4g}ms'.format(acc_global_time))
+    # print('修复值与正确值平均误差: {:.4g}'.format(delta(acc_global_modified, idf.clean)))
+    # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, acc_global_modified)))
+
+    # IMR修复
+    # imr_modified, imr_is_modified, imr_time = IMR(max_iter=1000).clean(idf)
+    # print('{:=^80}'.format(' IMR算法修复数据集{} '.format(idf.dataset.upper())))
+    # print('修复用时: {:.4g}ms'.format(imr_time))
+    # print('修复值与正确值平均误差: {:.4g}'.format(delta(imr_modified, idf.clean)))
+    # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, imr_modified)))
+
+    # EWMA修复
+    # ewma_modified, ewma_is_modified, ewma_time = ewma(idf, beta=0.9)
+    # print('{:=^80}'.format(' EWMA算法修复数据集{} '.format(idf.dataset.upper())))
+    # print('修复用时: {:.4g}ms'.format(ewma_time))
+    # print('修复值与正确值平均误差: {:.4g}'.format(delta(ewma_modified, idf.clean)))
+    # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, ewma_modified)))
+
+    # 中值滤波器修复
+    # median_filter_modified, median_filter_is_modified, median_filter_time = median_filter(idf, w=10)
+    # print('{:=^80}'.format(' 中值滤波修复数据集{} '.format(idf.dataset.upper())))
+    # print('修复用时: {:.4g}ms'.format(median_filter_time))
+    # print('修复值与正确值平均误差: {:.4g}'.format(delta(median_filter_modified, idf.clean)))
+    # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, median_filter_modified)))
+
+    # func-LP修复
+    # func_lp_modified, func_lp_is_modified, func_lp_time = func_lp(idf, w=w)
+    # print('{:=^80}'.format(' func-LP修复数据集{} '.format(idf.dataset.upper())))
+    # print('修复用时: {:.4g}ms'.format(func_lp_time))
+    # print('修复值与正确值平均误差: {:.4g}'.format(delta(func_lp_modified, idf.clean)))
+    # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, func_lp_modified)))
+
 
