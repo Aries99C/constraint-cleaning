@@ -32,6 +32,18 @@ def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=T
     len_time_performance = pd.DataFrame(
         columns=['data_len', 'Speed(L)', 'Speed(G)', 'speed+Acc(L)', 'speed+Acc(G)', 'IMR', 'EWMA', 'Median']
     )
+    len_raa_performance = pd.DataFrame(
+        columns=['data_len', 'Speed(L)', 'Speed(G)', 'speed+Acc(L)', 'speed+Acc(G)', 'IMR', 'EWMA', 'Median']
+    )
+    len_precision_performance = pd.DataFrame(
+        columns=['data_len', 'Speed(L)', 'Speed(G)', 'speed+Acc(L)', 'speed+Acc(G)', 'IMR', 'EWMA', 'Median']
+    )
+    len_recall_performance = pd.DataFrame(
+        columns=['data_len', 'Speed(L)', 'Speed(G)', 'speed+Acc(L)', 'speed+Acc(G)', 'IMR', 'EWMA', 'Median']
+    )
+    len_f1_performance = pd.DataFrame(
+        columns=['data_len', 'Speed(L)', 'Speed(G)', 'speed+Acc(L)', 'speed+Acc(G)', 'IMR', 'EWMA', 'Median']
+    )
 
     for data_len in lens:
         mts = MTS(dataset, index_col, datetime_index, data_len, verbose=1)
@@ -108,12 +120,64 @@ def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=T
             ewma_time,
             median_filter_time
         ]
+        len_raa_performance.loc[len(len_raa_performance)] = [
+            data_len,
+            raa(mts.origin, mts.clean, speed_local_modified),
+            raa(mts.origin, mts.clean, speed_global_modified),
+            raa(mts.origin, mts.clean, acc_local_modified),
+            raa(mts.origin, mts.clean, acc_global_modified),
+            raa(mts.origin, mts.clean, imr_modified),
+            raa(mts.origin, mts.clean, ewma_modified),
+            raa(mts.origin, mts.clean, median_filter_modified)
+        ]
+        len_precision_performance.loc[len(len_precision_performance)] = [
+            data_len,
+            f1(speed_local_is_modified, mts.isDirty)[0],
+            f1(speed_global_is_modified, mts.isDirty)[0],
+            f1(acc_local_is_modified, mts.isDirty)[0],
+            f1(acc_global_is_modified, mts.isDirty)[0],
+            f1(imr_is_modified, mts.isDirty)[0],
+            f1(ewma_is_modified, mts.isDirty)[0],
+            f1(median_filter_is_modified, mts.isDirty)[0]
+        ]
+        len_recall_performance.loc[len(len_recall_performance)] = [
+            data_len,
+            f1(speed_local_is_modified, mts.isDirty)[1],
+            f1(speed_global_is_modified, mts.isDirty)[1],
+            f1(acc_local_is_modified, mts.isDirty)[1],
+            f1(acc_global_is_modified, mts.isDirty)[1],
+            f1(imr_is_modified, mts.isDirty)[1],
+            f1(ewma_is_modified, mts.isDirty)[1],
+            f1(median_filter_is_modified, mts.isDirty)[1]
+        ]
+        len_f1_performance.loc[len(len_f1_performance)] = [
+            data_len,
+            f1(speed_local_is_modified, mts.isDirty)[2],
+            f1(speed_global_is_modified, mts.isDirty)[2],
+            f1(acc_local_is_modified, mts.isDirty)[2],
+            f1(acc_global_is_modified, mts.isDirty)[2],
+            f1(imr_is_modified, mts.isDirty)[2],
+            f1(ewma_is_modified, mts.isDirty)[2],
+            f1(median_filter_is_modified, mts.isDirty)[2]
+        ]
 
     # 数据集错误比例的对比实验
     ratio_error_performance = pd.DataFrame(
         columns=['error_ratio', 'Speed(L)', 'Speed(G)', 'speed+Acc(L)', 'speed+Acc(G)', 'IMR', 'EWMA', 'Median']
     )
     ratio_time_performance = pd.DataFrame(
+        columns=['error_ratio', 'Speed(L)', 'Speed(G)', 'speed+Acc(L)', 'speed+Acc(G)', 'IMR', 'EWMA', 'Median']
+    )
+    ratio_raa_performance = pd.DataFrame(
+        columns=['error_ratio', 'Speed(L)', 'Speed(G)', 'speed+Acc(L)', 'speed+Acc(G)', 'IMR', 'EWMA', 'Median']
+    )
+    ratio_precision_performance = pd.DataFrame(
+        columns=['error_ratio', 'Speed(L)', 'Speed(G)', 'speed+Acc(L)', 'speed+Acc(G)', 'IMR', 'EWMA', 'Median']
+    )
+    ratio_recall_performance = pd.DataFrame(
+        columns=['error_ratio', 'Speed(L)', 'Speed(G)', 'speed+Acc(L)', 'speed+Acc(G)', 'IMR', 'EWMA', 'Median']
+    )
+    ratio_f1_performance = pd.DataFrame(
         columns=['error_ratio', 'Speed(L)', 'Speed(G)', 'speed+Acc(L)', 'speed+Acc(G)', 'IMR', 'EWMA', 'Median']
     )
 
@@ -192,13 +256,62 @@ def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=T
             ewma_time,
             median_filter_time
         ]
+        ratio_raa_performance.loc[len(ratio_raa_performance)] = [
+            error_ratio,
+            raa(mts.origin, mts.clean, speed_local_modified),
+            raa(mts.origin, mts.clean, speed_global_modified),
+            raa(mts.origin, mts.clean, acc_local_modified),
+            raa(mts.origin, mts.clean, acc_global_modified),
+            raa(mts.origin, mts.clean, imr_modified),
+            raa(mts.origin, mts.clean, ewma_modified),
+            raa(mts.origin, mts.clean, median_filter_modified)
+        ]
+        ratio_precision_performance.loc[len(ratio_precision_performance)] = [
+            error_ratio,
+            f1(speed_local_is_modified, mts.isDirty)[0],
+            f1(speed_global_is_modified, mts.isDirty)[0],
+            f1(acc_local_is_modified, mts.isDirty)[0],
+            f1(acc_global_is_modified, mts.isDirty)[0],
+            f1(imr_is_modified, mts.isDirty)[0],
+            f1(ewma_is_modified, mts.isDirty)[0],
+            f1(median_filter_is_modified, mts.isDirty)[0]
+        ]
+        ratio_recall_performance.loc[len(ratio_recall_performance)] = [
+            error_ratio,
+            f1(speed_local_is_modified, mts.isDirty)[1],
+            f1(speed_global_is_modified, mts.isDirty)[1],
+            f1(acc_local_is_modified, mts.isDirty)[1],
+            f1(acc_global_is_modified, mts.isDirty)[1],
+            f1(imr_is_modified, mts.isDirty)[1],
+            f1(ewma_is_modified, mts.isDirty)[1],
+            f1(median_filter_is_modified, mts.isDirty)[1]
+        ]
+        ratio_f1_performance.loc[len(ratio_f1_performance)] = [
+            error_ratio,
+            f1(speed_local_is_modified, mts.isDirty)[2],
+            f1(speed_global_is_modified, mts.isDirty)[2],
+            f1(acc_local_is_modified, mts.isDirty)[2],
+            f1(acc_global_is_modified, mts.isDirty)[2],
+            f1(imr_is_modified, mts.isDirty)[2],
+            f1(ewma_is_modified, mts.isDirty)[2],
+            f1(median_filter_is_modified, mts.isDirty)[2]
+        ]
 
     # 保存数据
     len_error_performance.to_csv(PROJECT_ROOT + '/{}_len_error.csv'.format(dataset.upper()))
     len_time_performance.to_csv(PROJECT_ROOT + '/{}_len_time.csv'.format(dataset.upper()))
+    len_raa_performance.to_csv(PROJECT_ROOT + '/{}_len_raa.csv'.format(dataset.upper()))
+    len_precision_performance.to_csv(PROJECT_ROOT + '/{}_len_precision.csv'.format(dataset.upper()))
+    len_recall_performance.to_csv(PROJECT_ROOT + '/{}_len_recall.csv'.format(dataset.upper()))
+    len_f1_performance.to_csv(PROJECT_ROOT + '/{}_len_f1.csv'.format(dataset.upper()))
+
     ratio_error_performance.to_csv(PROJECT_ROOT + '/{}_ratio_error.csv'.format(dataset.upper()))
-    ratio_error_performance.to_csv(PROJECT_ROOT + '/{}_ratio_time.csv'.format(dataset.upper()))
+    ratio_time_performance.to_csv(PROJECT_ROOT + '/{}_ratio_time.csv'.format(dataset.upper()))
+    ratio_raa_performance.to_csv(PROJECT_ROOT + '/{}_ratio_raa.csv'.format(dataset.upper()))
+    ratio_precision_performance.to_csv(PROJECT_ROOT + '/{}_ratio_precision.csv'.format(dataset.upper()))
+    ratio_recall_performance.to_csv(PROJECT_ROOT + '/{}_ratio_recall.csv'.format(dataset.upper()))
+    ratio_f1_performance.to_csv(PROJECT_ROOT + '/{}_ratio_f1.csv'.format(dataset.upper()))
 
 
 if __name__ == '__main__':
-    benchmark_performance(lens=range(5000, 10000, 5000), ratios=np.arange(0.05, 0.1, 0.05))
+    benchmark_performance(lens=range(2000, 20000+1, 2000), ratios=np.arange(0.05, 0.35+0.01, 0.05))
