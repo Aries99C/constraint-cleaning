@@ -184,7 +184,7 @@ class MTS(object):
         while error_size > 0:
             insert_attrs = random.sample(self.cols, int(ratio * self.dim))  # 随机注入部分属性
             insert_len = random.randint(10, 50)                             # 随机的错误长度
-            insert_pos = random.randint(10, self.len - insert_len - 1)      # 随机的注入位置
+            insert_pos = random.randint(20, self.len - insert_len - 1)      # 随机的注入位置
             for attr in insert_attrs:
                 if self.isDirty[attr].values[insert_pos]:   # 若已经注入过错误就跳过
                     continue
@@ -232,19 +232,19 @@ if __name__ == '__main__':
     w = 2
 
     idf = MTS('idf', 'timestamp', True, size=5000, verbose=1)                   # 读取数据集
-    idf.constraints_mining(w=w, verbose=1)                                      # 挖掘约束
-    # idf.constraints_mining(pre_mined=True, verbose=0)                           # 预配置约束集合
+    # idf.constraints_mining(w=w, verbose=1)                                      # 挖掘约束
+    idf.constraints_mining(pre_mined=True, verbose=1)                           # 预配置约束集合
     idf.insert_error(snr=15, verbose=1)                                         # 注入噪声
 
     # 速度约束Local修复
-    # speed_local_modified, speed_local_is_modified, speed_local_time = speed_local(idf)
+    # speed_local_modified, speed_local_is_modified, speed_local_time = speed_local(idf, w=w)
     # print('{:=^80}'.format(' 局部速度约束修复数据集{} '.format(idf.dataset.upper())))
     # print('修复用时: {:.4g}ms'.format(speed_local_time))
     # print('修复值与正确值平均误差: {:.4g}'.format(delta(speed_local_modified, idf.clean)))
     # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, speed_local_modified)))
 
     # 速度约束Global修复
-    # speed_global_modified, speed_global_is_modified, speed_global_time = speed_global(idf)
+    # speed_global_modified, speed_global_is_modified, speed_global_time = speed_global(idf, w=w, x=10)
     # print('{:=^80}'.format(' 全局速度约束修复数据集{} '.format(idf.dataset.upper())))
     # print('修复用时: {:.4g}ms'.format(speed_global_time))
     # print('修复值与正确值平均误差: {:.4g}'.format(delta(speed_global_modified, idf.clean)))
@@ -286,10 +286,13 @@ if __name__ == '__main__':
     # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, median_filter_modified)))
 
     # func-LP修复
-    # func_lp_modified, func_lp_is_modified, func_lp_time = func_lp(idf, w=w)
-    # print('{:=^80}'.format(' func-LP修复数据集{} '.format(idf.dataset.upper())))
-    # print('修复用时: {:.4g}ms'.format(func_lp_time))
-    # print('修复值与正确值平均误差: {:.4g}'.format(delta(func_lp_modified, idf.clean)))
-    # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, func_lp_modified)))
+    func_lp_modified, func_lp_is_modified, func_lp_time = func_lp(idf, w=w)
+    print('{:=^80}'.format(' func-LP修复数据集{} '.format(idf.dataset.upper())))
+    print('修复用时: {:.4g}ms'.format(func_lp_time))
+    print('修复值与正确值平均误差: {:.4g}'.format(delta(func_lp_modified, idf.clean)))
+    print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, func_lp_modified)))
 
-
+    # idf.clean.plot(subplots=True, figsize=(10, 10))
+    # idf.origin.plot(subplots=True, figsize=(10, 10))
+    # func_lp_modified.plot(subplots=True, figsize=(10, 10))
+    # plt.show()

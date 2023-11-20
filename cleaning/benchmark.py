@@ -430,10 +430,8 @@ def median_filter(mts, w=10):
     return modified, is_modified, time_cost
 
 
-def func_lp(mts, w=2):
-    modified = mts.modified.copy(deep=True)         # 拷贝数据
-    is_modified = mts.isModified.copy(deep=True)    # 拷贝修复单元格信息
-    time_cost = 0.                                  # 时间成本
+def func_lp(mts, w=2, x=20):
+    modified, is_modified, time_cost = speed_global(mts, w, x)
 
     for i in range(mts.len - w):    # 对每个切片直接构建线性规划问题
         # 获取切片数据
@@ -444,34 +442,9 @@ def func_lp(mts, w=2):
         c = np.ones(2 * data.shape[0])  # u_i和v_i的系数均为1，目标函数：min Σ(u_i + v_i)
         A = []  # u_i和v_i的系数由stcd中每个t_i[A]的系数得到
         b = []  # b由stcd的lb和ub得到
-        bounds = [(0, None) for j in range(2 * data.shape[0])]  # 所有u_i和v_i都大于等于0
+        bounds = [(0, None) for _ in range(2 * data.shape[0])]  # 所有u_i和v_i都大于等于0
 
-        # 添加速度约束
-        for j, col in enumerate(mts.cols):
-            # 获取当前列的速度约束上下界
-            s_lb = mts.speed_constraints[col][0]
-            s_ub = mts.speed_constraints[col][1]
-            for l in range(w):
-                for r in range(l + 1, w):
-                    # 速度约束下界
-                    b_lr_min = -s_lb * (r - l) + (data[l * mts.dim + j] - data[r * mts.dim + j])
-                    a_lr_min = np.zeros(2 * data.shape[0])
-                    a_lr_min[r * mts.dim + j], a_lr_min[l * mts.dim + j] = 1, -1
-                    a_lr_min[r * mts.dim + j + data.shape[0]], a_lr_min[l * mts.dim + j + data.shape[0]] = -1, 1
-                    A.append(a_lr_min)
-                    b.append(b_lr_min)
-                    # 速度约束上界
-                    b_lr_max = s_ub * (r - l) + (data[l * mts.dim + j] - data[r * mts.dim + j])
-                    a_lr_max = np.zeros(2 * data.shape[0])
-                    a_lr_max[r * mts.dim + j], a_lr_max[l * mts.dim + j] = 1, -1
-                    a_lr_max[r * mts.dim + j + data.shape[0]], a_lr_max[l * mts.dim + j + data.shape[0]] = -1, 1
-                    A.append(a_lr_max)
-                    b.append(b_lr_max)
-
-        if w > 1:
-            res = linprog(c, A_ub=np.array(A), b_ub=np.array(b), bounds=bounds).x  # 默认是速度约束解
-        else:
-            res = None
+        res = None  # 默认无解
 
         for rule in mts.stcds:  # 将stcd转化为线性规划问题的约束条件
             lb = rule.lb    # 约束下界
@@ -510,10 +483,10 @@ def func_lp(mts, w=2):
             A.append(a_lb)
             b.append(b_lb)
             # 记录最后一次成功求解
-            tmp = linprog(c, A_ub=np.array(A), b_ub=np.array(b), bounds=bounds).x
-            if tmp is not None:
-                res = tmp
-            else:
+            result = linprog(c, A_ub=np.array(A), b_ub=np.array(b), bounds=bounds)
+            if result.success:
+                res = result.x
+            else:   # 约束冲突直接停止
                 break
         # 记录运行时间
         end = time.perf_counter()
@@ -521,7 +494,7 @@ def func_lp(mts, w=2):
 
         # 求解成功则更新数据
         if res is not None:
-            modified.values[i:i+w, :] = (res[w*mts.dim:] - res[:w*mts.dim] + data).reshape(w, mts.dim)
+            modified.values[i:i+w, :] = (res[:data.shape[0]] - res[data.shape[0]:] + data).reshape(w, mts.dim)
 
     # 根据差值判断数据是否被修复
     for col in modified.columns:

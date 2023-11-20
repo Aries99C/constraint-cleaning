@@ -1,3 +1,5 @@
+import difflib
+import itertools
 import math
 import random
 import numpy as np
@@ -40,15 +42,28 @@ class Linear:
             for i, col in enumerate(self.mts.cols):
                 self.variables.append((t, col, i))   # 每个变量的形式为(时间戳，列名称，列索引)
 
-    def mini_mine_sh(self, x, y, x_vars, y_var, max_x=5, verbose=0):
-        # 生成随机掩码集合来学习规则
-        x_possible = set()                      # 可能存在关联的变量X集合
-        while len(x_possible) < 1024:
-            mask = random_mask(len(x_vars), max_x=max_x)    # 获得随机掩码
-            if '1' not in mask:                 # 随机选择没有选到任何变量X
-                continue
-            else:
-                x_possible.add(mask)
+    def mini_mine_sh(self, x, y, x_vars, y_var, max_x=1, verbose=0):
+        # 在所有可能的掩码中学习规则
+        x_possible = all_masks(len(x_vars), max_x)
+        # 过滤相似度低的属性
+        remove_mask = []
+        for mask_str in x_possible:
+            mask = str2mask(mask_str)
+            for i in range(len(mask)):
+                if mask[i] == 1 and str_similar(x_vars[i][1], y_var[1]) < 0.8:
+                    remove_mask.append(mask_str)
+        for mask in remove_mask:
+            x_possible.remove(mask)
+
+        # # 生成随机掩码集合来学习规则
+        # x_possible = set()                      # 可能存在关联的变量X集合
+        # while len(x_possible) < 1024:
+        #     mask = random_mask(len(x_vars), max_x=max_x)    # 获得随机掩码
+        #     if '1' not in mask:                 # 随机选择没有选到任何变量X
+        #         continue
+        #     else:
+        #         x_possible.add(mask)
+
         # 使用sklearn学习线性模型
         while len(x_possible) > self.n_components:  # 一直筛选直到得到参数限定的掩码个数
             n_possible = len(x_possible)
@@ -120,7 +135,7 @@ class Linear:
                 print(r_mine)
             self.rules.append(r_mine)                                   # 添加规则
 
-    def mine(self, max_x=5, verbose=0):
+    def mine(self, max_x=1, verbose=0):
         if verbose > 0:         # 日志显示
             print('{:=^80}'.format(' 在数据集{}上挖掘线性时窗约束 '.format(self.mts.dataset.upper())))
         d = array2window(self.mts.clean2array(), self.win_size)     # 对多元时序数据切片
@@ -157,16 +172,33 @@ def array2window(x, win_size=2):
 def random_mask(vec_len, max_x):
     """
     随机生成长度为vec_len的01掩码串
-    :param max_x: 掩码中为1的最大位数，限制约束的复杂程度
     :param vec_len: 生成的掩码长度
+    :param max_x: 掩码中为1的最大位数，限制约束的复杂程度
     :return: 长度为vec_len的随机01掩码串
     """
     one_bits = random.randint(1, max_x)
-    mask_list = ['0' for i in range(vec_len)]
+    mask_list = ['0' for _ in range(vec_len)]
     while mask_list.count('1') < one_bits:
         random_bit = random.randint(0, vec_len-1)
         mask_list[random_bit] = '1'
     return ''.join(mask_list)
+
+
+def all_masks(vec_len, max_x):
+    """
+    生成长度为vec_len的所有可能的01掩码串
+    :param vec_len: 生成的掩码长度
+    :param max_x: 掩码中为1的最大位数，限制约束的复杂程度
+    :return: 长度为vec_len的所有01掩码串
+    """
+    masks = set()
+    masks_with_one = [''.join(item) for item in itertools.product("01", repeat=max_x)]   # 生成长度为max_x的01全排列
+    masks_with_one.pop(0)    # 删除全0的排列项
+    for i in range(vec_len - max_x):
+        for with_one in masks_with_one:
+            mask = '0' * i + with_one + '0' * (vec_len - max_x - i)
+            masks.add(mask)
+    return masks
 
 
 def str2mask(mask_str):
@@ -175,6 +207,10 @@ def str2mask(mask_str):
         return mask
     except ValueError:
         return None
+
+
+def str_similar(a, b):
+    return difflib.SequenceMatcher(None, a, b).quick_ratio()
 
 
 class Rule:
@@ -209,3 +245,7 @@ class Rule:
         f = f + ' ({}) '.format(round(self.func['intercept'], 2))
         f = f + ' - (t{}[{}]) <= {}'.format(self.y_name[0], self.y_name[1], round(self.ub, 2))
         return f
+
+
+if __name__ == '__main__':
+    print(str_similar('U3_HNC10CT111', 'U3_HNC10CT121'))
