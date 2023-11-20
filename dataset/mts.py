@@ -203,8 +203,7 @@ class MTS(object):
         for col in self.isModified.columns:
             self.isModified[col] = False    # 全部初始化为False
 
-        error_sum = self.delta_clean_origin()                           # 总误差
-        error_aver = self.delta_clean_origin() / (self.len * self.dim)  # 平均误差
+        error_aver = self.delta_clean_origin()  # 平均误差
 
         print('{:=^80}'.format(' 向数据集{}注入错误 '.format(self.dataset.upper())))
         print('共计注入错误单元格数: {}'.format(insert_size))
@@ -216,7 +215,7 @@ class MTS(object):
                 self.modified.plot(subplots=True, figsize=(20, 40))
                 plt.show()
 
-        return insert_size, error_sum, error_aver
+        return insert_size, error_aver
 
     def delta_clean_origin(self):
         """
@@ -224,7 +223,7 @@ class MTS(object):
         """
         df = self.clean.sub(self.origin)    # 两个mts相减
         x = np.absolute(df.values)          # 获取ndarray的绝对值
-        return np.sum(x)
+        return np.sum(x) / (df.shape[0] * df.shape[1])
 
 
 if __name__ == '__main__':
