@@ -106,6 +106,8 @@ def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=T
         len_recall_performance.loc[idx] = [data_len] + rs
         len_f1_performance.loc[idx] = [data_len] + fs
 
+        idx += 1
+
     # 数据集错误比例的对比实验
     ratio_error_performance = pd.DataFrame(
         columns=['data_len'] + [func_name for func_name in methods]
@@ -173,6 +175,8 @@ def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=T
         ratio_recall_performance.loc[idx] = [error_ratio] + rs
         ratio_f1_performance.loc[idx] = [error_ratio] + fs
 
+        idx += 1
+
     # 保存数据
     len_error_performance.to_csv(PROJECT_ROOT + '/{}_len_error.csv'.format(dataset.upper()))
     len_time_performance.to_csv(PROJECT_ROOT + '/{}_len_time.csv'.format(dataset.upper()))
@@ -190,4 +194,4 @@ def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=T
 
 
 if __name__ == '__main__':
-    benchmark_performance(lens=range(5000, 5000 + 1, 2000), ratios=np.arange(0.1, 0.1 + 0.01, 0.05))
+    benchmark_performance(lens=range(2000, 20000 + 1, 2000), ratios=np.arange(0.05, 0.35 + 0.01, 0.05))

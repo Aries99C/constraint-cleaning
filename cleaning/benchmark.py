@@ -431,7 +431,7 @@ def median_filter(mts, w=10):
 
 
 def func_lp(mts, w=2, x=20):
-    modified, is_modified, time_cost = speed_global(mts, w, x)
+    modified, is_modified, time_cost = speed_global(mts, w, x)      # 速度约束保底
 
     for i in range(mts.len - w):    # 对每个切片直接构建线性规划问题
         # 获取切片数据
