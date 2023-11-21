@@ -178,19 +178,19 @@ def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=T
         idx += 1
 
     # 保存数据
-    len_error_performance.to_csv(PROJECT_ROOT + '/{}_len_error.csv'.format(dataset.upper()))
-    len_time_performance.to_csv(PROJECT_ROOT + '/{}_len_time.csv'.format(dataset.upper()))
-    len_raa_performance.to_csv(PROJECT_ROOT + '/{}_len_raa.csv'.format(dataset.upper()))
-    len_precision_performance.to_csv(PROJECT_ROOT + '/{}_len_precision.csv'.format(dataset.upper()))
-    len_recall_performance.to_csv(PROJECT_ROOT + '/{}_len_recall.csv'.format(dataset.upper()))
-    len_f1_performance.to_csv(PROJECT_ROOT + '/{}_len_f1.csv'.format(dataset.upper()))
+    len_error_performance.to_csv(PROJECT_ROOT + '/{}_len_error.csv'.format(dataset.upper()), index=False)
+    len_time_performance.to_csv(PROJECT_ROOT + '/{}_len_time.csv'.format(dataset.upper()), index=False)
+    len_raa_performance.to_csv(PROJECT_ROOT + '/{}_len_raa.csv'.format(dataset.upper()), index=False)
+    len_precision_performance.to_csv(PROJECT_ROOT + '/{}_len_precision.csv'.format(dataset.upper()), index=False)
+    len_recall_performance.to_csv(PROJECT_ROOT + '/{}_len_recall.csv'.format(dataset.upper()), index=False)
+    len_f1_performance.to_csv(PROJECT_ROOT + '/{}_len_f1.csv'.format(dataset.upper()), index=False)
 
-    ratio_error_performance.to_csv(PROJECT_ROOT + '/{}_ratio_error.csv'.format(dataset.upper()))
-    ratio_time_performance.to_csv(PROJECT_ROOT + '/{}_ratio_time.csv'.format(dataset.upper()))
-    ratio_raa_performance.to_csv(PROJECT_ROOT + '/{}_ratio_raa.csv'.format(dataset.upper()))
-    ratio_precision_performance.to_csv(PROJECT_ROOT + '/{}_ratio_precision.csv'.format(dataset.upper()))
-    ratio_recall_performance.to_csv(PROJECT_ROOT + '/{}_ratio_recall.csv'.format(dataset.upper()))
-    ratio_f1_performance.to_csv(PROJECT_ROOT + '/{}_ratio_f1.csv'.format(dataset.upper()))
+    ratio_error_performance.to_csv(PROJECT_ROOT + '/{}_ratio_error.csv'.format(dataset.upper()), index=False)
+    ratio_time_performance.to_csv(PROJECT_ROOT + '/{}_ratio_time.csv'.format(dataset.upper()), index=False)
+    ratio_raa_performance.to_csv(PROJECT_ROOT + '/{}_ratio_raa.csv'.format(dataset.upper()), index=False)
+    ratio_precision_performance.to_csv(PROJECT_ROOT + '/{}_ratio_precision.csv'.format(dataset.upper()), index=False)
+    ratio_recall_performance.to_csv(PROJECT_ROOT + '/{}_ratio_recall.csv'.format(dataset.upper()), index=False)
+    ratio_f1_performance.to_csv(PROJECT_ROOT + '/{}_ratio_f1.csv'.format(dataset.upper()), index=False)
 
 
 if __name__ == '__main__':

@@ -229,13 +229,12 @@ class Rule:
         :param y: 变量y的值
         :return:
         """
-        f = self.model.predict(x) - y   # 计算函数值f
-        if self.lb <= f <= self.ub:
-            return 0.
-        elif f < self.lb:
+        f = (self.model.predict(x) - y)
+        if f < self.lb:
             return self.lb - f
-        else:
+        if f > self.ub:
             return f - self.ub
+        return 0.
 
     def __str__(self):
         f = '{} <= '.format(round(self.lb, 2))
@@ -245,6 +244,12 @@ class Rule:
         f = f + ' ({}) '.format(round(self.func['intercept'], 2))
         f = f + ' - (t{}[{}]) <= {}'.format(self.y_name[0], self.y_name[1], round(self.ub, 2))
         return f
+
+    def __hash__(self):
+        return hash(self.y_name[1])
+
+    def __eq__(self, other):
+        return self.y_name[1] == other.y_name[1]
 
 
 if __name__ == '__main__':

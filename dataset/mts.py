@@ -12,7 +12,7 @@ from constraints.speed.mining import mining_speed_constraints
 from constraints.acc.mining import mining_acc_constraints
 from constraints.stcd.mining import mining_stcd
 
-from cleaning.benchmark import delta, raa, speed_local, speed_global, acc_local, acc_global, IMR, ewma, median_filter, func_lp
+from cleaning.benchmark import delta, raa, speed_local, speed_global, acc_local, acc_global, IMR, ewma, median_filter, func_lp, func_mvc
 
 pd.set_option('display.max_rows', 20)
 pd.set_option('display.max_columns', 100)
@@ -290,6 +290,13 @@ if __name__ == '__main__':
     print('修复用时: {:.4g}ms'.format(func_lp_time))
     print('修复值与正确值平均误差: {:.4g}'.format(delta(func_lp_modified, idf.clean)))
     print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, func_lp_modified)))
+
+    # func-mvc修复
+    func_mvc_modified, func_mvc_is_modified, func_mvc_time = func_mvc(idf, w=w)
+    print('{:=^80}'.format(' func-MVC修复数据集{} '.format(idf.dataset.upper())))
+    print('修复用时: {:.4g}ms'.format(func_mvc_time))
+    print('修复值与正确值平均误差: {:.4g}'.format(delta(func_mvc_modified, idf.clean)))
+    print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, func_mvc_modified)))
 
     # idf.clean.plot(subplots=True, figsize=(10, 10))
     # idf.origin.plot(subplots=True, figsize=(10, 10))
