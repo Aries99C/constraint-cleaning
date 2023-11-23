@@ -431,165 +431,121 @@ def median_filter(mts, w=10):
     return modified, is_modified, time_cost
 
 
-def func_lp(mts, w=2, x=20):
-    modified, is_modified, time_cost = speed_global(mts, w, x)      # 速度约束保底
+def func_lp(mts, w=2, size=20, overlapping_ratio=0.2):
+    modified = mts.modified.copy(deep=True)  # 拷贝数据
+    is_modified = mts.isModified.copy(deep=True)  # 拷贝修复单元格信息
+    time_cost = 0.  # 时间成本
+    success_cnt = 0
 
-    for i in range(mts.len - w):    # 对每个切片直接构建线性规划问题
-        # 获取切片数据
-        data = array2window(df2array(modified), w)[i]
+    m = mts.dim     # 属性个数
 
+    s = 0
+    while s + size <= mts.len:
+        # 获取大窗口内的数据
+        win = min(size, mts.len - s)
+        data = array2window(df2array(modified), win)[s]
         # 构建线性规划问题
         start = time.perf_counter()
-        c = np.ones(2 * data.shape[0])  # u_i和v_i的系数均为1，目标函数：min Σ(u_i + v_i)
-        A = []  # u_i和v_i的系数由stcd中每个t_i[A]的系数得到
-        b = []  # b由stcd的lb和ub得到
-        bounds = [(0, None) for _ in range(2 * data.shape[0])]  # 所有u_i和v_i都大于等于0
+        # 初始化
+        c = np.ones(2 * data.shape[0])
+        A = []
+        b = []
+        bounds = [(0, None) for j in range(2 * data.shape[0])]
+        # 利用速度约束填补参数
+        for idx, col in enumerate(modified.columns):
+            # 获取当前列的速度约束上下界
+            s_lb = mts.speed_constraints[col][0]
+            s_ub = mts.speed_constraints[col][1]
+            # 时窗限制内约束
+            for i in range(win):
+                for j in range(i + 1, win):
+                    if j > i + w:   # 只考虑时窗限制内的
+                        break
+                    # 速度下界
+                    b_lb = -s_lb * (j - i) + (data[j * m + idx] - data[i * m + idx])
+                    a_lb = np.zeros(2 * data.shape[0])
+                    a_lb[j * m + idx], a_lb[j * m + idx + data.shape[0]] = -1, 1
+                    a_lb[i * m + idx], a_lb[i * m + idx + data.shape[0]] = 1, -1
+                    A.append(a_lb)
+                    b.append(b_lb)
+                    # 速度上界
+                    b_ub = s_ub * (j - i) - (data[j * m + idx] - data[i * m + idx])
+                    a_ub = np.zeros(2 * data.shape[0])
+                    a_ub[j * m + idx], a_ub[j * m + idx + data.shape[0]] = 1, -1
+                    a_ub[i * m + idx], a_ub[i * m + idx + data.shape[0]] = -1, 1
+                    A.append(a_ub)
+                    b.append(b_ub)
+        # 默认速度约束求解
+        res = linprog(c, A_ub=A, b_ub=b, bounds=bounds).x
+        rules = random.sample(mts.stcds, 3)
+        for rule in rules:
+            # 解析约束的参数
+            lb = rule.lb  # 约束下界
+            ub = rule.ub  # 约束上界
+            intercept = rule.func['intercept']  # 约束的模型截距
+            y_pos = rule.y_name[0] * m + rule.y_name[2]  # 约束f(X)->Y的Y在切片中的位置
+            # 对每个切片生成一组约束
+            for i in range(win - w):
+                # 获取切片
+                t = data[i * m: (i+w) * m]
 
-        res = None  # 默认无解
+                # 根据y_pos将切片分为x和y
+                x = np.append(t[:y_pos], t[y_pos+1:]) if y_pos > 0 else t[y_pos+1:]
+                y = t[y_pos]
+                # 计算约束对应的系数A和b
+                # 将x'和y'都变成u和v：x'=x+(u-v), y'=y+(u-v);
 
-        for rule in mts.stcds:  # 将stcd转化为线性规划问题的约束条件
-            lb = rule.lb    # 约束下界
-            ub = rule.ub    # 约束上界
-            y_pos = rule.y_name[0] * mts.dim + rule.y_name[2]   # 约束f(X)->Y的Y在切片中的位置
-            # 根据y_pos将切片分为x和y
-            x = np.append(data[:y_pos], data[y_pos+1:]) if y_pos > 0 else data[y_pos+1:]
-            y = data[y_pos]
-            # 计算约束对应的系数A和b
-            # 将x'和y'都变成u和v：x'=x+(u-v), y'=y+(u-v);
+                # 上界对应约束 Σ a_i * x'_i + b - y' <= ub
+                a_ub = np.zeros(2 * data.shape[0])  # 前一半是u_i的系数，后一半是v_i的系数
+                b_ub = ub + y - intercept
+                a_ub[i * m: (i+w) * m] = rule.alpha
+                a_ub[i * m + data.shape[0]: (i + w) * m + data.shape[0]] = -rule.alpha
+                for j in range(len(t)):
+                    b_ub -= rule.alpha[j] * t[j]
+                A.append(a_ub)
+                b.append(b_ub)
 
-            # 上界对应约束 Σ a_i * x'_i + b - y' <= ub
-            a_ub = np.zeros(2 * data.shape[0])          # 前一半是u_i的系数，后一半是v_i的系数
-            b_ub = ub + y
-            for j in range(len(rule.x_names)):          # 变量x在x_names中的顺序
-                x_pos = rule.x_names[j][0] * mts.dim + rule.x_names[j][2]   # 变量x在切片中的位置
-                x_coef = rule.func['coef'][j]           # 变量x在stcd中的系数
-                a_ub[x_pos], a_ub[x_pos + data.shape[0]] = x_coef, -x_coef  # u_x和v_x的系数为a_x和-a_x
-                b_ub -= x_coef * x[j]                   # 每个原变量x'都提供一个x，需要在上界中减去
-            a_ub[y_pos], a_ub[y_pos + data.shape[0]] = -1, 1        # u_y和v_y的系数为-1和1
-            # 添加约束
-            A.append(a_ub)
-            b.append(b_ub)
+        try_x = linprog(c, A_ub=A, b_ub=b, bounds=bounds).x
+        if try_x is not None:
+            success_cnt += 1
+            res = try_x
 
-            # 下界对应约束 lb <= Σ a_i * x'_i + b - y'
-            # 转化成小于等于的形式：Σ -a_i * x'_i
-            a_lb = np.zeros(2 * data.shape[0])      # 前一半是u_i的系数，后一半是v_i的系数
-            b_lb = - lb - y
-            for j in range(len(rule.x_names)):          # 变量x在x_names中的顺序
-                x_pos = rule.x_names[j][0] * mts.dim + rule.x_names[j][2]   # 变量x在切片中的位置
-                x_coef = rule.func['coef'][j]           # 变量x在stcd中的系数
-                a_lb[x_pos], a_lb[x_pos + data.shape[0]] = -x_coef, x_coef  # u_x和v_x的系数为a_x和-a_x
-                b_lb += x_coef * x[j]                   # 每个原变量x'都提供一个x，需要在上界中减去
-            a_ub[y_pos], a_ub[y_pos + data.shape[0]] = 1, -1        # u_y和v_y的系数为-1和1
-            # 添加约束
-            A.append(a_lb)
-            b.append(b_lb)
-
-            # 记录最后一次成功求解
-            result = linprog(c, A_ub=np.array(A), b_ub=np.array(b), bounds=bounds)
-            if result.success:
-                res = result.x
-            else:   # 约束冲突直接停止
-                break
-        # 记录运行时间
         end = time.perf_counter()
         time_cost += end - start
 
-        # 求解成功则更新数据
         if res is not None:
-            modified.values[i:i+w, :] = (res[:data.shape[0]] - res[data.shape[0]:] + data).reshape(w, mts.dim)
+            modified.values[s:s+win] = ((res[:data.shape[0]] - res[data.shape[0]:]) + data).reshape(win, m)
+        s += int((1 - overlapping_ratio) * size)
 
     # 根据差值判断数据是否被修复
     for col in modified.columns:
         modified_values = modified[col].values
         origin_values = mts.origin[col].values
-        for i in range(len(modified)):
-            if abs(modified_values[i] - origin_values[i]) > 10e-3:
-                is_modified[col].values[i] = True
+        for k in range(len(modified)):
+            if abs(modified_values[k] - origin_values[k]) > 10e-3:
+                is_modified[col].values[k] = True
 
+    # print('成功添加约束{}次'.format(success_cnt))
     return modified, is_modified, time_cost
 
 
-def func_mvc(mts, w=2, x=20, mvc='base', max_iteration=1):
-    modified, is_modified, time_cost = speed_global(mts, w, x)      # 速度约束保底
-    # modified = mts.modified.copy(deep=True)  # 拷贝数据
-    # is_modified = mts.isModified.copy(deep=True)  # 拷贝修复单元格信息
+def func_mvc(mts, w=2, x=20, mvc='base'):
+    modified = mts.modified.copy(deep=True)  # 拷贝数据
+    is_modified = mts.isModified.copy(deep=True)  # 拷贝修复单元格信息
     time_cost = 0.  # 时间成本
 
     for i in range(mts.len - w):
         # 构建约束超图的结构G=(V,E)，其中V表示时序数据的切片，E表示约束集合
         data = array2window(df2array(modified), w)[i]   # 获取切片数据
-        hypergraph = (data, mts.stcds.copy())
+        hypergraph = (data, random.sample(mts.stcds, 20))
 
-        start = time.perf_counter()
-        # 异常检测保证超图中所有边都没有被违反
+        # 对切片执行约束违反检测
         violation = violation_detect(hypergraph, mts.dim)
-        if len(violation) == 0:     # 不存在约束违反时停止迭代
-            continue
+
         # 调用FindKeyCell找到切片中的关键单元格
         key_cell_pos = find_key_cell(violation, mts.dim, mvc=mvc)
 
-        # 利用KeyCell构建更小的线性规划问题
-        c = np.ones(2 * data.shape[0]) + 2.  # u_i和v_i的系数均为1，目标函数：min Σ(u_i + v_i)
-        for pos in key_cell_pos:
-            c[pos], c[pos + data.shape[0]] = 1., 1.
-        A = []  # u_i和v_i的系数由stcd中每个t_i[A]的系数得到
-        b = []  # b由stcd的lb和ub得到
-        bounds = [(0, None) for _ in range(2 * data.shape[0])]  # 所有u_i和v_i都大于等于0
-
-        res = None  # 默认无解
-
-        for rule in mts.stcds:     # 将stcd转化为线性规划问题的约束条件
-            lb = rule.lb  # 约束下界
-            ub = rule.ub  # 约束上界
-            y_pos = rule.y_name[0] * mts.dim + rule.y_name[2]  # 约束f(X)->Y的Y在切片中的位置
-            # 根据y_pos将切片分为x和y
-            x = np.append(data[:y_pos], data[y_pos + 1:]) if y_pos > 0 else data[y_pos + 1:]
-            y = data[y_pos]
-            # 计算约束对应的系数A和b
-            # 将x'和y'都变成u和v：x'=x+(u-v), y'=y+(u-v);
-
-            # 上界对应约束 Σ a_i * x'_i + b - y' <= ub
-            a_ub = np.zeros(2 * data.shape[0])  # 前一半是u_i的系数，后一半是v_i的系数
-            b_ub = ub + y
-            for j in range(len(rule.x_names)):  # 变量x在x_names中的顺序
-                x_pos = rule.x_names[j][0] * mts.dim + rule.x_names[j][2]  # 变量x在切片中的位置
-                x_coef = rule.func['coef'][j]  # 变量x在stcd中的系数
-                a_ub[x_pos], a_ub[x_pos + data.shape[0]] = x_coef, -x_coef  # u_x和v_x的系数为a_x和-a_x
-                b_ub -= x_coef * x[j]  # 每个原变量x'都提供一个x，需要在上界中减去
-            a_ub[y_pos], a_ub[y_pos + data.shape[0]] = -1, 1  # u_y和v_y的系数为-1和1
-            # 添加约束
-            A.append(a_ub)
-            b.append(b_ub)
-
-            # 下界对应约束 lb <= Σ a_i * x'_i + b - y'
-            # 转化成小于等于的形式：Σ -a_i * x'_i
-            a_lb = np.zeros(2 * data.shape[0])  # 前一半是u_i的系数，后一半是v_i的系数
-            b_lb = - lb - y
-            for j in range(len(rule.x_names)):  # 变量x在x_names中的顺序
-                x_pos = rule.x_names[j][0] * mts.dim + rule.x_names[j][2]  # 变量x在切片中的位置
-                x_coef = rule.func['coef'][j]  # 变量x在stcd中的系数
-                a_lb[x_pos], a_lb[x_pos + data.shape[0]] = -x_coef, x_coef  # u_x和v_x的系数为a_x和-a_x
-                b_lb += x_coef * x[j]  # 每个原变量x'都提供一个x，需要在上界中减去
-            a_ub[y_pos], a_ub[y_pos + data.shape[0]] = 1, -1  # u_y和v_y的系数为-1和1
-            # 添加约束
-            A.append(a_lb)
-            b.append(b_lb)
-
-            # 记录最后一次成功求解
-            result = linprog(c, A_ub=np.array(A), b_ub=np.array(b), bounds=bounds)
-            if result.success:
-                res = result.x
-            else:  # 约束冲突直接停止
-                break
-        # 记录运行时间
-        end = time.perf_counter()
-        time_cost += end - start
-
-        # 求解成功则更新数据
-        if res is not None:
-            data = data + (res[:data.shape[0]] - res[data.shape[0]:])
-
-        modified.values[i:i + w, :] = data.reshape(w, mts.dim)
+        # 在关键单元格上结合速度约束进行修复
 
     # 根据差值判断数据是否被修复
     for col in modified.columns:
@@ -603,22 +559,13 @@ def func_mvc(mts, w=2, x=20, mvc='base', max_iteration=1):
 
 
 def violation_detect(hypergraph, m):
-    data, rules = hypergraph    # 解析超图
+    t, rules = hypergraph    # 解析超图
 
     violation = []      # 约束违反情况
 
     for rule in rules:
-        y_pos = rule.y_name[0] * m + rule.y_name[2]     # Y在切片中的位置
-        # 将数据切片划分为X与Y
-        x_idx = []  # 记录变量X的位置的列表
-        for x_var in rule.x_names:
-            x_idx.append(x_var[0] * m + x_var[2])
-        x = data[x_idx]
-        y = data[y_pos]
-        if len(x.shape) == 1:  # 如果只选中一列X，需要reshape成2d数据
-            x = x.reshape(-1, 1)
         # 调用规则的违反程度分数计算
-        degree = rule.violation_degree(x, y)
+        degree = rule.violation_degree(t)
         if degree >= 1e-3:  # 没有被违反的规则可以删除
             violation.append((rule, degree))
 
@@ -628,13 +575,9 @@ def violation_detect(hypergraph, m):
 def find_key_cell(violation, m, mvc='base'):
     key_cell_pos = []   # 最终返回待清洗的关键变量
 
-    for t in sorted(violation, key=lambda x: x[1], reverse=True):
-        x_vars = t[0].x_names
-        for x_var in x_vars:
-            x_pos = x_var[0] * m + x_var[2]
-            if x_pos not in key_cell_pos:
-                key_cell_pos.append(x_pos)
-        if len(key_cell_pos) > 10:
-            break
+    sorted_violation = sorted(violation, key=lambda x: x[1], reverse=True)
+
+    for rule, degree in sorted_violation:
+        pass
 
     return key_cell_pos

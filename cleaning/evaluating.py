@@ -31,8 +31,8 @@ def f1(is_modified, is_dirty):
     return p, r, f
 
 
-def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=True, w=3,
-                          lens=range(2000, 10000, 2000), ratios=np.arange(0.05, 0.25, 0.05),
+def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=True, w=2,
+                          lens=range(2000, 20000+1, 2000), ratios=np.arange(0.05, 0.35+0.01, 0.05),
                           constraints=None, methods=None):
     if methods is None:
         methods = ['Speed(L)', 'Speed(G)', 'Speed+Acc(L)', 'Speed+Acc(G)', 'IMR', 'EWMA', 'Median', 'Func_LP']
@@ -191,6 +191,11 @@ def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=T
     ratio_precision_performance.to_csv(PROJECT_ROOT + '/{}_ratio_precision.csv'.format(dataset.upper()), index=False)
     ratio_recall_performance.to_csv(PROJECT_ROOT + '/{}_ratio_recall.csv'.format(dataset.upper()), index=False)
     ratio_f1_performance.to_csv(PROJECT_ROOT + '/{}_ratio_f1.csv'.format(dataset.upper()), index=False)
+
+
+def fd_and_rfd(dataset='idf', index_col='timestamp', datetime_index=True,
+                          lens=range(2000, 20000+1, 2000), ratios=np.arange(0.05, 0.35+0.01, 0.05)):
+    pass
 
 
 if __name__ == '__main__':

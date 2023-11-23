@@ -120,6 +120,8 @@ class MTS(object):
                 pass
             if 'rfd' in self.mining_constraints:    # 支持rfd
                 pass
+            if 'fd' in self.mining_constraints:     # 支持fd
+                pass
         else:           # 否则需要挖掘规则
             if 'speed' in self.mining_constraints:  # 支持速度约束
                 self.speed_constraints = mining_speed_constraints(self, alpha=3, verbose=verbose)
@@ -136,6 +138,8 @@ class MTS(object):
             if 'crr' in self.mining_constraints:    # 支持crr
                 pass
             if 'rfd' in self.mining_constraints:    # 支持rfd
+                pass
+            if 'fd' in self.mining_constraints:     # 支持fd
                 pass
 
     def clean2array(self):
@@ -285,18 +289,18 @@ if __name__ == '__main__':
     # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, median_filter_modified)))
 
     # func-LP修复
-    func_lp_modified, func_lp_is_modified, func_lp_time = func_lp(idf, w=w)
-    print('{:=^80}'.format(' func-LP修复数据集{} '.format(idf.dataset.upper())))
-    print('修复用时: {:.4g}ms'.format(func_lp_time))
-    print('修复值与正确值平均误差: {:.4g}'.format(delta(func_lp_modified, idf.clean)))
-    print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, func_lp_modified)))
+    # func_lp_modified, func_lp_is_modified, func_lp_time = func_lp(idf, w=w)
+    # print('{:=^80}'.format(' func-LP修复数据集{} '.format(idf.dataset.upper())))
+    # print('修复用时: {:.4g}ms'.format(func_lp_time))
+    # print('修复值与正确值平均误差: {:.4g}'.format(delta(func_lp_modified, idf.clean)))
+    # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, func_lp_modified)))
 
     # func-mvc修复
-    func_mvc_modified, func_mvc_is_modified, func_mvc_time = func_mvc(idf, w=w)
-    print('{:=^80}'.format(' func-MVC修复数据集{} '.format(idf.dataset.upper())))
-    print('修复用时: {:.4g}ms'.format(func_mvc_time))
-    print('修复值与正确值平均误差: {:.4g}'.format(delta(func_mvc_modified, idf.clean)))
-    print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, func_mvc_modified)))
+    # func_mvc_modified, func_mvc_is_modified, func_mvc_time = func_mvc(idf, w=w)
+    # print('{:=^80}'.format(' func-MVC修复数据集{} '.format(idf.dataset.upper())))
+    # print('修复用时: {:.4g}ms'.format(func_mvc_time))
+    # print('修复值与正确值平均误差: {:.4g}'.format(delta(func_mvc_modified, idf.clean)))
+    # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, func_mvc_modified)))
 
     # idf.clean.plot(subplots=True, figsize=(10, 10))
     # idf.origin.plot(subplots=True, figsize=(10, 10))

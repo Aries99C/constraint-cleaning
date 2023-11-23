@@ -45,12 +45,12 @@ class Linear:
     def mini_mine_sh(self, x, y, x_vars, y_var, max_x=1, verbose=0):
         # 在所有可能的掩码中学习规则
         x_possible = all_masks(len(x_vars), max_x)
-        # 过滤相似度低的属性
+        # 过滤相似度低的属性，也过滤速度约束
         remove_mask = []
         for mask_str in x_possible:
             mask = str2mask(mask_str)
             for i in range(len(mask)):
-                if mask[i] == 1 and str_similar(x_vars[i][1], y_var[1]) < 0.8:
+                if mask[i] == 1 and (str_similar(x_vars[i][1], y_var[1]) < 0.8 or (x_vars[i][2] == y_var[2])):
                     remove_mask.append(mask_str)
         for mask in remove_mask:
             x_possible.remove(mask)
@@ -130,7 +130,7 @@ class Linear:
             gamma = mean_loss
             +b * math.sqrt(math.log(1/(1-self.confidence))/(2*m))
             +b * math.sqrt(2*(len(x_vars)+1)*((math.log((math.e*m)/(2*(len(x_vars)+1))))/m))
-            r_mine = Rule(x_names, y_var, func, -gamma, gamma, model)   # 解析规则
+            r_mine = Rule(x_names, y_var, func, -gamma, gamma, model, self.mts.dim, self.win_size)   # 解析规则
             if verbose > 0:     # 展示规则
                 print(r_mine)
             self.rules.append(r_mine)                                   # 添加规则
@@ -214,22 +214,37 @@ def str_similar(a, b):
 
 
 class Rule:
-    def __init__(self, x_names, y_name, func, lb, ub, model):
+    def __init__(self, x_names, y_name, func, lb, ub, model, m, w):
         self.x_names = x_names
         self.y_name = y_name
         self.func = func
         self.lb = lb
         self.ub = ub
         self.model = model
+        self.m = m
+        self.w = w
+        self.alpha = np.zeros(self.m * self.w)
+        self.mask = self.get_mask()
 
-    def violation_degree(self, x, y):
+    def get_mask(self):
+        mask = np.zeros(self.m * self.w)      # 初始化掩码为全0
+        for i, x_name in enumerate(self.x_names):
+            x_pos = x_name[0] * self.m + x_name[2]
+            mask[x_pos] = 1
+            self.alpha[x_pos] = self.func['coef'][i]
+        y_pos = self.y_name[0] * self.m + self.y_name[2]
+        mask[y_pos] = 1
+        self.alpha[y_pos] = -1
+
+        return mask
+
+    def violation_degree(self, t):
         """
         计算约束违反程度
-        :param x: 变量X集合的数据
-        :param y: 变量y的值
+        :param t: 数据切片
         :return:
         """
-        f = (self.model.predict(x) - y)
+        f = np.dot(t, self.alpha) + self.func['intercept']
         if f < self.lb:
             return self.lb - f
         if f > self.ub:
@@ -237,12 +252,12 @@ class Rule:
         return 0.
 
     def __str__(self):
-        f = '{} <= '.format(round(self.lb, 2))
+        f = '{:.3f} <= '.format(self.lb, 2)
         for i in range(len(self.x_names)):
-            f = f + '{}*t{}[{}]'.format(round(self.func['coef'][i], 2), self.x_names[i][0], self.x_names[i][1])
+            f = f + '{:.3f}*t{}[{}]'.format(self.func['coef'][i], self.x_names[i][0], self.x_names[i][1])
             f = f + ' + '
-        f = f + ' ({}) '.format(round(self.func['intercept'], 2))
-        f = f + ' - (t{}[{}]) <= {}'.format(self.y_name[0], self.y_name[1], round(self.ub, 2))
+        f = f + ' ({:.3f}) '.format(self.func['intercept'])
+        f = f + ' - (t{}[{}]) <= {:.3f}'.format(self.y_name[0], self.y_name[1], self.ub, 2)
         return f
 
     def __hash__(self):
@@ -253,4 +268,4 @@ class Rule:
 
 
 if __name__ == '__main__':
-    print(str_similar('U3_HNC10CT111', 'U3_HNC10CT121'))
+    print(str_similar('U3_HNC10CT121', 'U3_HNC10CT121'))
