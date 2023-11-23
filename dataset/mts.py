@@ -11,6 +11,7 @@ from dataset import DATASETS
 from constraints.speed.mining import mining_speed_constraints
 from constraints.acc.mining import mining_acc_constraints
 from constraints.stcd.mining import mining_stcd
+from constraints.fd.mining import read_from_TANE
 
 from cleaning.benchmark import delta, raa, speed_local, speed_global, acc_local, acc_global, IMR, ewma, median_filter, func_lp, func_mvc
 
@@ -54,6 +55,7 @@ class MTS(object):
         self.speed_constraints = None   # 速度约束
         self.acc_constraints = None     # 加速度约束
         self.stcds = None               # 时窗约束
+        self.fds = None                 # 函数依赖
 
         assert dataset in DATASETS.keys()   # 保证使用了预设的数据集，请在__init__.py文件中配置
 
@@ -88,7 +90,7 @@ class MTS(object):
         :param verbose: 日志显示
         """
         if mining_constraints is None:
-            self.mining_constraints = ['speed', 'acc', 'stcd']  # 默认挖掘的约束
+            self.mining_constraints = ['speed', 'acc', 'stcd', 'fd']  # 默认挖掘的约束
         else:
             self.mining_constraints = mining_constraints        # 自定义约束
         if pre_mined:   # 使用预先挖掘好的规则，直接读取即可
@@ -121,7 +123,13 @@ class MTS(object):
             if 'rfd' in self.mining_constraints:    # 支持rfd
                 pass
             if 'fd' in self.mining_constraints:     # 支持fd
-                pass
+                with open(PROJECT_ROOT + '/constraints/rules/{}_fd.txt'.format(self.dataset), 'rb') as f:
+                    self.fds = pickle.load(f)
+                    print('{:=^80}'.format(' 读取数据集{}上的函数依赖 '.format(self.dataset.upper())))
+                    print('约束数量: {}'.format(len(self.fds)))
+                    if verbose > 0:  # 输出时窗约束的形式
+                        for lhs, rhs in self.fds:
+                            print('函数依赖: {} -> {}'.format([var[0] for var in lhs], rhs[0]))
         else:           # 否则需要挖掘规则
             if 'speed' in self.mining_constraints:  # 支持速度约束
                 self.speed_constraints = mining_speed_constraints(self, alpha=3, verbose=verbose)
@@ -140,7 +148,9 @@ class MTS(object):
             if 'rfd' in self.mining_constraints:    # 支持rfd
                 pass
             if 'fd' in self.mining_constraints:     # 支持fd
-                pass
+                self.fds = read_from_TANE(self, verbose=verbose)
+                with open(PROJECT_ROOT + '/constraints/rules/{}_fd.txt'.format(self.dataset), 'wb') as f:
+                    pickle.dump(self.fds, f)  # pickle序列化函数依赖
 
     def clean2array(self):
         d = self.clean.copy(deep=True)      # 拷贝正确值
@@ -234,10 +244,10 @@ if __name__ == '__main__':
     # 实验参数
     w = 2
 
-    idf = MTS('idf', 'timestamp', True, size=5000, verbose=1)                   # 读取数据集
-    # idf.constraints_mining(w=w, verbose=1)                                      # 挖掘约束
-    idf.constraints_mining(pre_mined=True, verbose=1)                           # 预配置约束集合
-    idf.insert_error(snr=15, verbose=1)                                         # 注入噪声
+    idf = MTS('idf', 'timestamp', True, size=5000, verbose=1)                      # 读取数据集
+    # idf.constraints_mining(mining_constraints=['fd'], w=w, verbose=1)             # 挖掘约束
+    idf.constraints_mining(mining_constraints=['fd'], pre_mined=True, verbose=1)    # 预配置约束集合
+    idf.insert_error(snr=15, verbose=1)                                             # 注入噪声
 
     # 速度约束Local修复
     # speed_local_modified, speed_local_is_modified, speed_local_time = speed_local(idf, w=w)
