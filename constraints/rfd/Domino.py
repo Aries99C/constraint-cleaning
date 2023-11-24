@@ -1,17 +1,7 @@
-from relax import FD
-from relax import RFD
 import numpy as np
-import math
-import pandas as pd
 import random
-import sys
-import os
 
-'''
- 判断是否全为1，用于集合覆盖过程，判断是否所有的数据都被覆盖
- @param S 集合，为一个01组成的数组
- @return bool True:全为1  False：不全为1
-'''
+from constraints.rfd.pre import pre_glass
 
 
 def getDistanceRelation(r):
@@ -30,8 +20,8 @@ def orderedRelation(diff_list, i):
     return diff_list[np.argsort(diff_list[:, i])]
 
 
-def dominate(T_beta, diff_list_a):
-    for h in T_beta:
+def dominate(t_beta, diff_list_a):
+    for h in t_beta:
         flag = True
         for j in range(len(h)):
             if h[j] > diff_list_a[j]:
@@ -42,8 +32,8 @@ def dominate(T_beta, diff_list_a):
 
 
 def getTRel(diff_list_a, i):
-    T = []
-    T_beta = []
+    t = []
+    t_beta = []
     w = len(diff_list_a)
     step = 1
     while w > 0:
@@ -51,81 +41,81 @@ def getTRel(diff_list_a, i):
         while beta != 0 and diff_list_a[beta - 1][i] == diff_list_a[beta][i]:
             beta = beta - 1
         for j in range(beta, w):
-            if dominate(T_beta, diff_list_a[j]):
+            if dominate(t_beta, diff_list_a[j]):
                 continue
-            T_beta.append(diff_list_a[j])
-        T.append((T_beta, (i, diff_list_a[beta][i])))
+            t_beta.append(diff_list_a[j])
+        t.append((t_beta, (i, diff_list_a[beta][i])))
         w = beta
         step = step * 2
-    return T
+    return t
 
 
-def viable(X, DM):
-    for h in DM:
+def viable(x, dm):
+    for h in dm:
         flag1 = False
         flag2 = True
-        for f in X:
+        for f in x:
             if h[f] != 0:
                 flag2 = False
             if h[f] < 0:
                 flag1 = True
-        if flag1 == False and flag2 == False:
+        if (not flag1) and (not flag2):
             return False
     return True
 
 
-def redundant(X_new, LHS):
-    for i in LHS:
-        d = [False for c in i not in X_new]
+def redundant(x_new, lhs):
+    for i in lhs:
+        d = [False for c in i not in x_new]
         if not d:
             return True
     return False
 
 
-def generateRFDcs(T_beta, w, LHS):
-    RFDcs = []
-    for cc in LHS:
-        LHS_now = []
+def generateRFDcs(t_beta, w, lhs):
+    rfd_cs = []
+    for cc in lhs:
+        lhs_now = []
         for i in cc:
             if i == cc[0]:
-                LHS_now.append([i, w[i] - 0.001])
+                lhs_now.append([i, w[i] - 0.001])
                 continue
-            LHS_now.append([i, w[i]])
+            lhs_now.append([i, w[i]])
         for j in range(1, len(cc)):
             kk = 99999999
-            for i in T_beta:
+            for i in t_beta:
                 if i == w:
                     continue
-                if T_beta[i][cc[j]] <= w[cc[j]]:
+                if t_beta[i][cc[j]] <= w[cc[j]]:
                     continue
-                if T_beta[i][cc[0]] >= w[cc[0]]:
+                if t_beta[i][cc[0]] >= w[cc[0]]:
                     continue
                 flag = True
                 for e in range(j):
-                    if T_beta[i][cc[e]] > LHS_now[e][1]:
+                    if t_beta[i][cc[e]] > lhs_now[e][1]:
                         flag = False
                 if not flag:
                     continue
                 flag = False
                 for e in range(j + 1, len(cc)):
-                    if T_beta[i][cc[e]] <= LHS_now[e][1]:
+                    if t_beta[i][cc[e]] <= lhs_now[e][1]:
                         flag = True
                 if not flag:
                     continue
-                kk = min(kk, T_beta[i][cc[j]])
+                kk = min(kk, t_beta[i][cc[j]])
             if kk == 99999999:
                 continue
-            LHS_now[j][1] = kk - 0.001
-        RFDcs.append(LHS_now)
-    return RFDcs
+            lhs_now[j][1] = kk - 0.001
+        rfd_cs.append(lhs_now)
+    return rfd_cs
 
 
-def getRFDs(T_beta, A_i, w):
+def getRFDs(t_beta, a_i, w):
     L = 1
     levelAttr = []
     LHS = []
     DM = []
-    for i in T_beta:
+    for i in t_beta:
         if i.all() == w.all():
             continue
         kk = []
@@ -133,7 +123,7 @@ def getRFDs(T_beta, A_i, w):
             kk.append(i[j] - w[j])
         DM.append(kk)
     for i in range(len(w)):
-        if i == A_i:
+        if i == a_i:
             continue
         levelAttr.append([i])
     while L <= len(w) and len(levelAttr) != 0:
@@ -145,26 +135,15 @@ def getRFDs(T_beta, A_i, w):
         for X in levelAttr:
             if not viable(X, DM):
                 for kk in range(len(w)):
-                    if kk == A_i:
+                    if kk == a_i:
                         continue
                     X_new = X
                     X_new.append(kk)
                     if not redundant(X_new, LHS):
                         levelAttr.append(X_new)
         L = L + 1
-    return generateRFDcs(T_beta, w, LHS)
+    return generateRFDcs(t_beta, w, LHS)
 
-
-def my_print(ans, file):
-    f = open(file, 'w')
-    for i in ans:
-        for j in i[0]:
-            print("(%s , <= , %.2f)" % (name_list[j[0]], j[1]), end=' ', file=f)
-
-        if len(i[0]) != 0:
-            print(",", end='  ', file=f)
-        print("(%s , <= , %.2f)" % (name_list[i[1][0]], i[1][1]), file=f)
-    f.close()
 
 def Domino(r):
     RFDcs = []
@@ -185,36 +164,63 @@ def Domino(r):
     return RFDcs
 
 
-from pre import pre_glass
-
-
-def test(Distance, name_list):
-    import time
-
-    start = time.time()
-    ans = Domino(Distance)
-    end = time.time()
-    my_print(ans, "123.txt")
-    print("No.1")
-    print("Glass:", Distance.shape)
-    print("Time:", (end - start))
-    '''print("Score:", get_Score(Distance, ans))'''
-    print("Cnt:", len(ans))
-
-
-def make_data(Distance_new, rate):
-    for i in range(len(Distance_new)):
+def make_data(distance_new, rate):
+    for i in range(len(distance_new)):
         rad = random.random()
         if rad < rate:
-            Distance_new[i] = Distance_new[i] * rate
-    return Distance_new
+            distance_new[i] = distance_new[i] * rate
+    return distance_new
 
 
-def work():
-    global name_list
-    Distance, name_list = pre_glass(50, 6)
-    test(Distance, name_list)
+def mine(distance, mts):
+    # 挖掘RFD
+    res = Domino(distance)
+    # 存储RFD
+    rfds = []
+    for i in res:
+        # 条件X，可能为空
+        conditions = []
+        for j in i[0]:
+            conditions.append((mts.cols[j[0]], j[1]))  # 每个条件X的形式为：(属性, 属性在元组间允许的差值范围)
+        # 映射Y
+        y = (mts.cols[i[1][0]], i[1][1])
+        rfds.append((conditions, y))
+
+        # 判断RFD重复
+        duplicate = False
+        for idx, (cmp_conditions, cmp_y) in enumerate(rfds):
+            if len(cmp_conditions) == len(conditions):  # 可能存在X重复
+                x_duplicate = True
+                for k in range(len(conditions)):
+                    if not cmp_conditions[k][0] == conditions[k][0]:
+                        x_duplicate = False
+                        break
+                if x_duplicate and cmp_y[0] == y[0]:  # 确定X和Y重复
+                    new_conditions = []
+                    for k in range(len(conditions)):
+                        new_conditions.append((conditions[k][0], max(cmp_conditions[k][1], conditions[k][1])))
+                    new_y = (cmp_y[0], max(cmp_y[1], y[1]))
+                    rfds[idx] = (new_conditions, new_y)
+                    duplicate = True
+                    break
+        if not duplicate:
+            rfds.append((conditions, y))
+
+    return rfds
 
 
-if __name__ == "__main__":
-    work()
+def domino_mining_rfd(mts, n=100, m=10, verbose=0):
+    # 读取部分数据
+    distance, name_list = pre_glass(mts, n, m)
+    # 挖掘规则
+    rfds = mine(distance, mts)
+
+    if verbose > 0:
+        print('{:=^80}'.format(' 在数据集{}上挖掘松弛函数依赖-Domino '.format(mts.dataset.upper())))
+        for conditions, y in rfds:
+            if len(conditions) == 0:
+                print('松弛函数依赖: d({}) <= {:.3f}'.format(y[0], y[1]))
+            else:
+                print('松弛函数依赖: {} --> {}'.format(['d({}) <= {:.3f}'.format(cond[0], cond[1]) for cond in conditions], 'd({}) <= {:.3f}'.format(y[0], y[1])))
+
+    return rfds

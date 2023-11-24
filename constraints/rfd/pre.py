@@ -1,17 +1,14 @@
 import numpy as np
-import os
-import pandas as pd
 
 
-def read_data(file_name):
-    path = os.getcwd() + file_name
-    f = open(path, encoding='utf-8')
-    data = pd.read_csv(f)
-    name_list = ["fixed acidity", "volatile acidity", "citric acid", "residual sugar", "chlorides"
-        , "free sulfur dioxide", "total sulfur dioxide", "density", "pH", "sulphates", "alcohol", "quality", "Id"]
-    data_x = data[name_list]
-    x = data_x.values
-    return x, name_list
+def pre_glass(mts, n, m):
+    data, cols = mts.clean.values, mts.cols
+
+    data = np.array(data)
+    data = data[:n, :m]
+    Distance = getDistanceRelation(data)
+
+    return Distance, cols
 
 
 def getDistanceRelation(r):
@@ -26,11 +23,4 @@ def getDistanceRelation(r):
     return res
 
 
-def pre_glass(n, m):
-    data, label = read_data('\\WineQT.csv')
 
-    data = np.array(data)
-    data = data[:n, :m]
-    Distance = getDistanceRelation(data)
-
-    return Distance, label

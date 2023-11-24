@@ -5,6 +5,7 @@ from matplotlib import pyplot as plt
 
 from scipy.optimize import linprog
 from constraints.stcd.linear import array2window
+from sklearn.metrics import precision_score, recall_score, f1_score
 
 
 def delta(a, b, aver=True):
@@ -19,9 +20,27 @@ def raa(origin, clean, modified):
     return 1 - delta(modified, clean) / (delta(origin, modified) + delta(origin, clean))
 
 
+def f1(is_modified, is_dirty):
+    a = is_modified.values.reshape(-1)
+    b = is_dirty.values.reshape(-1)
+
+    p, r, f = precision_score(a, b), recall_score(a, b), f1_score(a, b)
+
+    return p, r, f
+
+
 def df2array(df):
     d = df.copy(deep=True)  # 拷贝值
     return d.values  # 将Dataframe转换为ndarray类型
+
+
+def update_is_modified(mts, modified, is_modified):
+    for col in modified.columns:
+        modified_values = modified[col].values
+        origin_values = mts.origin[col].values
+        for i in range(len(modified)):
+            if abs(modified_values[i] - origin_values[i]) > 10e-3:
+                is_modified[col].values[i] = True
 
 
 def speed_local(mts, w=10):
@@ -110,12 +129,7 @@ def speed_global(mts, w=10, x=20, overlapping_ratio=0.2):
             time_cost += end - start
 
     # 根据差值判断数据是否被修复
-    for col in modified.columns:
-        modified_values = modified[col].values
-        origin_values = mts.origin[col].values
-        for i in range(len(modified)):
-            if abs(modified_values[i] - origin_values[i]) > 10e-3:
-                is_modified[col].values[i] = True
+    update_is_modified(mts, modified, is_modified)
 
     return modified, is_modified, time_cost
 
@@ -234,12 +248,7 @@ def acc_global(mts, w=10, x=20, overlapping_ratio=0.2):
             time_cost += end - start
 
     # 根据差值判断数据是否被修复
-    for col in modified.columns:
-        modified_values = modified[col].values
-        origin_values = mts.origin[col].values
-        for i in range(len(modified)):
-            if abs(modified_values[i] - origin_values[i]) > 10e-3:
-                is_modified[col].values[i] = True
+    update_is_modified(mts, modified, is_modified)
 
     return modified, is_modified, time_cost
 
@@ -373,12 +382,7 @@ class IMR:
             time_cost += end - start
 
         # 根据差值判断数据是否被修复
-        for col in modified.columns:
-            modified_values = modified[col].values
-            origin_values = mts.origin[col].values
-            for i in range(len(modified)):
-                if abs(modified_values[i] - origin_values[i]) > 10e-3:
-                    is_modified[col].values[i] = True
+        update_is_modified(mts, modified, is_modified)
 
         return modified, is_modified, time_cost
 
@@ -397,12 +401,7 @@ def ewma(mts, beta=0.9):
         time_cost += end - start
 
     # 根据差值判断数据是否被修复
-    for col in modified.columns:
-        modified_values = modified[col].values
-        origin_values = mts.origin[col].values
-        for i in range(len(modified)):
-            if abs(modified_values[i] - origin_values[i]) > 10e-3:
-                is_modified[col].values[i] = True
+    update_is_modified(mts, modified, is_modified)
 
     return modified, is_modified, time_cost
 
@@ -421,12 +420,7 @@ def median_filter(mts, w=10):
         time_cost += end - start
 
     # 根据差值判断数据是否被修复
-    for col in modified.columns:
-        modified_values = modified[col].values
-        origin_values = mts.origin[col].values
-        for i in range(len(modified)):
-            if abs(modified_values[i] - origin_values[i]) > 10e-3:
-                is_modified[col].values[i] = True
+    update_is_modified(mts, modified, is_modified)
 
     return modified, is_modified, time_cost
 
@@ -477,7 +471,8 @@ def func_lp(mts, w=2, size=20, overlapping_ratio=0.2):
                     b.append(b_ub)
         # 默认速度约束求解
         res = linprog(c, A_ub=A, b_ub=b, bounds=bounds).x
-        rules = random.sample(mts.stcds, 3)
+        rules = mts.stcds
+        # rules = random.sample(mts.stcds, 3)
         for rule in rules:
             # 解析约束的参数
             lb = rule.lb  # 约束下界
@@ -518,47 +513,112 @@ def func_lp(mts, w=2, size=20, overlapping_ratio=0.2):
         s += int((1 - overlapping_ratio) * size)
 
     # 根据差值判断数据是否被修复
-    for col in modified.columns:
-        modified_values = modified[col].values
-        origin_values = mts.origin[col].values
-        for k in range(len(modified)):
-            if abs(modified_values[k] - origin_values[k]) > 10e-3:
-                is_modified[col].values[k] = True
+    update_is_modified(mts, modified, is_modified)
 
     # print('成功添加约束{}次'.format(success_cnt))
     return modified, is_modified, time_cost
 
 
-def func_mvc(mts, w=2, x=20, mvc='base'):
+def func_mvc(mts, w=2, size=20, mvc='base', overlapping_ratio=0.3):
     modified = mts.modified.copy(deep=True)  # 拷贝数据
     is_modified = mts.isModified.copy(deep=True)  # 拷贝修复单元格信息
     time_cost = 0.  # 时间成本
+    success_cnt = 0
 
-    for i in range(mts.len - w):
-        # 构建约束超图的结构G=(V,E)，其中V表示时序数据的切片，E表示约束集合
-        data = array2window(df2array(modified), w)[i]   # 获取切片数据
-        hypergraph = (data, random.sample(mts.stcds, 20))
+    m = mts.dim  # 属性个数
 
-        # 对切片执行约束违反检测
-        violation = violation_detect(hypergraph, mts.dim)
+    s = 0
+    while s + size <= mts.len:
+        # 获取大窗口内的数据
+        win = min(size, mts.len - s)
+        data = array2window(df2array(modified), win)[s]
+        # 构建线性规划问题
+        start = time.perf_counter()
+        # 初始化
+        c = np.ones(2 * data.shape[0])
+        A = []
+        b = []
+        bounds = [(0, None) for j in range(2 * data.shape[0])]
+        # 利用速度约束填补参数
+        for idx, col in enumerate(modified.columns):
+            # 获取当前列的速度约束上下界
+            s_lb = mts.speed_constraints[col][0]
+            s_ub = mts.speed_constraints[col][1]
+            # 时窗限制内约束
+            for i in range(win):
+                for j in range(i + 1, win):
+                    if j > i + w:  # 只考虑时窗限制内的
+                        break
+                    # 速度下界
+                    b_lb = -s_lb * (j - i) + (data[j * m + idx] - data[i * m + idx])
+                    a_lb = np.zeros(2 * data.shape[0])
+                    a_lb[j * m + idx], a_lb[j * m + idx + data.shape[0]] = -1, 1
+                    a_lb[i * m + idx], a_lb[i * m + idx + data.shape[0]] = 1, -1
+                    A.append(a_lb)
+                    b.append(b_lb)
+                    # 速度上界
+                    b_ub = s_ub * (j - i) - (data[j * m + idx] - data[i * m + idx])
+                    a_ub = np.zeros(2 * data.shape[0])
+                    a_ub[j * m + idx], a_ub[j * m + idx + data.shape[0]] = 1, -1
+                    a_ub[i * m + idx], a_ub[i * m + idx + data.shape[0]] = -1, 1
+                    A.append(a_ub)
+                    b.append(b_ub)
+        # 默认速度约束求解
+        res = linprog(c, A_ub=A, b_ub=b, bounds=bounds).x
 
-        # 调用FindKeyCell找到切片中的关键单元格
-        key_cell_pos = find_key_cell(violation, mts.dim, mvc=mvc)
+        for i in range(win - w):
+            # 获取切片构建超图
+            t = data[i * m: (i + w) * m]
+            hypergraph = (t, mts.stcds)
 
-        # 在关键单元格上结合速度约束进行修复
+            # 切片做约束违反检测
+            violation = violation_detect(hypergraph)
+
+            # 调用FindKeyCell找到切片中的关键单元格
+            repair_edge, key_cell_pos = find_key_cell(violation, mvc=mvc)
+
+            # 围绕关键单元格生成约束
+            for rule in repair_edge:
+                # 解析约束的参数
+                lb = rule.lb  # 约束下界
+                ub = rule.ub  # 约束上界
+                intercept = rule.func['intercept']  # 约束的模型截距
+                y_pos = rule.y_name[0] * m + rule.y_name[2]  # 约束f(X)->Y的Y在切片中的位置
+                # 根据y_pos将切片分为x和y
+                x = np.append(t[:y_pos], t[y_pos + 1:]) if y_pos > 0 else t[y_pos + 1:]
+                y = t[y_pos]
+                # 计算约束对应的系数A和b
+                # 将x'和y'都变成u和v：x'=x+(u-v), y'=y+(u-v);
+
+                # 上界对应约束 Σ a_i * x'_i + b - y' <= ub
+                a_ub = np.zeros(2 * data.shape[0])  # 前一半是u_i的系数，后一半是v_i的系数
+                b_ub = ub + y - intercept
+                a_ub[i * m: (i + w) * m] = rule.alpha
+                a_ub[i * m + data.shape[0]: (i + w) * m + data.shape[0]] = -rule.alpha
+                for j in range(len(t)):
+                    b_ub -= rule.alpha[j] * t[j]
+                A.append(a_ub)
+                b.append(b_ub)
+
+        try_x = linprog(c, A_ub=A, b_ub=b, bounds=bounds).x
+        if try_x is not None:
+            success_cnt += 1
+            res = try_x
+
+        end = time.perf_counter()
+        time_cost += end - start
+
+        if res is not None:
+            modified.values[s:s+win] = ((res[:data.shape[0]] - res[data.shape[0]:]) + data).reshape(win, m)
+        s += int((1 - overlapping_ratio) * size)
 
     # 根据差值判断数据是否被修复
-    for col in modified.columns:
-        modified_values = modified[col].values
-        origin_values = mts.origin[col].values
-        for i in range(len(modified)):
-            if abs(modified_values[i] - origin_values[i]) > 10e-3:
-                is_modified[col].values[i] = True
+    update_is_modified(mts, modified, is_modified)
 
     return modified, is_modified, time_cost
 
 
-def violation_detect(hypergraph, m):
+def violation_detect(hypergraph):
     t, rules = hypergraph    # 解析超图
 
     violation = []      # 约束违反情况
@@ -572,12 +632,73 @@ def violation_detect(hypergraph, m):
     return violation
 
 
-def find_key_cell(violation, m, mvc='base'):
+def find_key_cell(violation, mvc='base'):
     key_cell_pos = []   # 最终返回待清洗的关键变量
 
-    sorted_violation = sorted(violation, key=lambda x: x[1], reverse=True)
+    pre_violation = None
 
-    for rule, degree in sorted_violation:
-        pass
+    if mvc == 'base':
+        pre_violation = violation.copy()
+        random.shuffle(pre_violation)
+    if mvc == 'sorted':
+        pre_violation = sorted(violation, key=lambda x: x[1], reverse=True)
 
-    return key_cell_pos
+    repair_edge = []
+
+    for rule, degree in pre_violation:
+        # 跳过已经被删除的边
+        skip = False
+        for pos in key_cell_pos:
+            if not rule.alpha[pos] == 0:
+                skip = True
+                break
+        if skip:
+            continue
+
+        # 将新的边删除
+        repair_edge.append(rule)
+        for i, x in enumerate(rule.alpha):
+            if not x == 0:
+                key_cell_pos.append(i)
+
+    return repair_edge, key_cell_pos
+
+
+def fd_detect(mts):
+    modified = mts.modified.copy(deep=True)  # 拷贝数据
+    is_modified = mts.isModified.copy(deep=True)  # 拷贝修复单元格信息
+    time_cost = 0.  # 时间成本
+
+    # 由于FD挖掘时无法识别浮点数，需要将数据修改为整形
+    for col in modified.columns:
+        # 乘100后四舍五入
+        modified[col] = modified[col] * 100
+        modified[col] = modified[col].astype(int)
+
+    # 开始检测
+    start = time.perf_counter()
+
+    for lhs, rhs in mts.fds:
+        for i in range(mts.len):
+            for j in range(i+1, mts.len):
+                t_i = modified.iloc[i]
+                t_j = modified.iloc[j]
+                # 判断两个元组的条件
+                condition = True
+                for col, idx in lhs:
+                    if not t_i[col] == t_j[col]:
+                        condition = False
+                        break
+                if condition:
+                    for col, idx in rhs:
+                        if not t_i[col] == t_j[col]:
+                            # print('检测到元组{}和元组{}违反FD: {} -> {}'.format(i, j, [col_ for col_, idx in lhs], col))
+                            is_modified[col].values[i] = True
+                            is_modified[col].values[j] = True
+                            for col_, idx_ in lhs:
+                                is_modified[col_].values[i] = True
+                                is_modified[col_].values[j] = True
+
+    time_cost += time.perf_counter() - start
+
+    return modified, is_modified, time_cost

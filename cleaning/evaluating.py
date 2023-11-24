@@ -1,9 +1,9 @@
 import numpy as np
 import pandas as pd
 import warnings
-from sklearn.metrics import precision_score, recall_score, f1_score
-from cleaning.benchmark import delta, raa, speed_local, speed_global, acc_local, acc_global, IMR, ewma, median_filter, \
-    func_lp
+
+from cleaning.benchmark import delta, raa, f1, speed_local, speed_global, acc_local, acc_global, IMR, ewma, median_filter, \
+    func_lp, func_mvc
 from dataset.mts import MTS
 from utils import project_root
 
@@ -19,23 +19,15 @@ func_dict = {
     'EWMA': ewma,
     'Median': median_filter,
     'Func_LP': func_lp,
+    'Func_MVC': func_mvc
 }
-
-
-def f1(is_modified, is_dirty):
-    a = is_modified.values.reshape(-1)
-    b = is_dirty.values.reshape(-1)
-
-    p, r, f = precision_score(a, b), recall_score(a, b), f1_score(a, b)
-
-    return p, r, f
 
 
 def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=True, w=2,
                           lens=range(2000, 20000+1, 2000), ratios=np.arange(0.05, 0.35+0.01, 0.05),
                           constraints=None, methods=None):
     if methods is None:
-        methods = ['Speed(L)', 'Speed(G)', 'Speed+Acc(L)', 'Speed+Acc(G)', 'IMR', 'EWMA', 'Median', 'Func_LP']
+        methods = ['Func_MVC', 'Func_LP', 'EWMA', 'Speed(G)', 'Speed+Acc(G)', 'Median', 'IMR', 'Speed(L)', 'Speed+Acc(L)']
     if constraints is None:
         constraints = ['speed', 'acc', 'stcd']
 
@@ -75,7 +67,7 @@ def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=T
 
         # 对测试列表中的所有方法都执行测试
         for method in methods:
-            if method in ['Speed(L)', 'Speed+Acc(L)', 'Median', 'Func_LP']:
+            if method in ['Speed(L)', 'Speed+Acc(L)', 'Median', 'Func_LP', 'Func_MVC']:
                 modified, is_modified, time = func_dict[method](mts, w=w)
             elif method in ['Speed(G)', 'Speed+Acc(G)']:
                 modified, is_modified, time = func_dict[method](mts, w=w, x=5)
@@ -144,7 +136,7 @@ def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=T
 
         # 对测试列表中的所有方法都执行测试
         for method in methods:
-            if method in ['Speed(L)', 'speed+Acc(L)', 'Median', 'Func_LP']:
+            if method in ['Speed(L)', 'speed+Acc(L)', 'Median', 'Func_LP', 'Func_MVC']:
                 modified, is_modified, time = func_dict[method](mts, w=w)
             elif method in ['Speed(G)', 'speed+Acc(G)']:
                 modified, is_modified, time = func_dict[method](mts, w=w, x=5)

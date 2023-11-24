@@ -1,7 +1,4 @@
 import numpy as np
-import math
-import os
-import pandas as pd
 import random
 
 
@@ -127,30 +124,3 @@ class RFD:
 def work(data, x):
     x.generator(data)
     return x
-
-
-if __name__ == "__main__":
-    path = os.getcwd() + '\\123.csv'
-    f = open(path, encoding='utf-8')
-    data = pd.read_csv(f)
-    data = data[~data['result'].isin([-1])]
-    name_list = ["H2", "CH4", "C2H4", "C2H2", "C2H6", "CO", "CO2", "O2", "N2", "TOTALHYDROCARBON"]
-    data_x = data[name_list]
-    data_y = data['result']
-    x = data_x.values
-    y = data_y.values
-    if len(x) == 0:
-        print("all -1")
-        exit(0)
-    from sklearn.preprocessing import StandardScaler
-
-    stand1 = StandardScaler()
-    stand1.fit(x)
-    x = stand1.transform(x)
-    print(x.shape)
-
-    data = x
-    f = FD([1, 4, 5], 0)
-    x = RFD(f, 0.477055385001098)
-    y = work(data, x)
-    x.print()

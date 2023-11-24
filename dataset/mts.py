@@ -12,8 +12,12 @@ from constraints.speed.mining import mining_speed_constraints
 from constraints.acc.mining import mining_acc_constraints
 from constraints.stcd.mining import mining_stcd
 from constraints.fd.mining import read_from_TANE
+from constraints.rfd.Domino import domino_mining_rfd
+from constraints.rfd.CORDS import cords_mining_rfd
+from constraints.rfd.IsCover import is_cover_mining_rfd
 
 from cleaning.benchmark import delta, raa, speed_local, speed_global, acc_local, acc_global, IMR, ewma, median_filter, func_lp, func_mvc
+from cleaning.benchmark import f1, fd_detect
 
 pd.set_option('display.max_rows', 20)
 pd.set_option('display.max_columns', 100)
@@ -56,6 +60,11 @@ class MTS(object):
         self.acc_constraints = None     # 加速度约束
         self.stcds = None               # 时窗约束
         self.fds = None                 # 函数依赖
+        self.domino = None              # Domino挖掘RFD
+        self.cords = None               # CORDS挖掘RFD
+        self.is_cover = None            # IsCover挖掘RFD
+
+        self.rfd_m = 10                 # RFD挖掘和检测时使用的列数
 
         assert dataset in DATASETS.keys()   # 保证使用了预设的数据集，请在__init__.py文件中配置
 
@@ -118,16 +127,53 @@ class MTS(object):
                     if verbose > 0:  # 输出时窗约束的形式
                         for rule in self.stcds:
                             print(rule)
-            if 'crr' in self.mining_constraints:    # 支持crr
+            if 'crr' in self.mining_constraints:        # 支持crr
                 pass
-            if 'rfd' in self.mining_constraints:    # 支持rfd
-                pass
-            if 'fd' in self.mining_constraints:     # 支持fd
+            if 'domino' in self.mining_constraints:     # 支持rfd
+                with open(PROJECT_ROOT + '/constraints/rules/{}_fd_domino.txt'.format(self.dataset), 'rb') as f:
+                    self.domino = pickle.load(f)
+                    print('{:=^80}'.format(' 读取数据集{}上的松弛函数依赖-Domino '.format(self.dataset.upper())))
+                    print('约束数量: {}'.format(len(self.domino)))
+                    if verbose > 0: # 输出松弛函数依赖
+                        for conditions, y in self.domino:
+                            if len(conditions) == 0:
+                                print('松弛函数依赖: d({}) <= {}'.format(y[0], y[1]))
+                            else:
+                                print('松弛函数依赖: {} --> {}'.format(
+                                    ['d({}) <= {}'.format(cond[0], cond[1]) for cond in conditions],
+                                    'd({}) <= {}'.format(y[0], y[1])))
+            if 'cords' in self.mining_constraints:     # 支持rfd
+                with open(PROJECT_ROOT + '/constraints/rules/{}_fd_cords.txt'.format(self.dataset), 'rb') as f:
+                    self.cords = pickle.load(f)
+                    print('{:=^80}'.format(' 读取数据集{}上的松弛函数依赖-CORDS '.format(self.dataset.upper())))
+                    print('约束数量: {}'.format(len(self.cords)))
+                    if verbose > 0: # 输出松弛函数依赖
+                        for conditions, y in self.cords:
+                            if len(conditions) == 0:
+                                print('松弛函数依赖: d({}) <= {}'.format(y[0], y[1]))
+                            else:
+                                print('松弛函数依赖: {} --> {}'.format(
+                                    ['d({}) <= {}'.format(cond[0], cond[1]) for cond in conditions],
+                                    'd({}) <= {}'.format(y[0], y[1])))
+            if 'is_cover' in self.mining_constraints:     # 支持rfd
+                with open(PROJECT_ROOT + '/constraints/rules/{}_fd_is_cover.txt'.format(self.dataset), 'rb') as f:
+                    self.is_cover = pickle.load(f)
+                    print('{:=^80}'.format(' 读取数据集{}上的松弛函数依赖-IsCover '.format(self.dataset.upper())))
+                    print('约束数量: {}'.format(len(self.is_cover)))
+                    if verbose > 0: # 输出松弛函数依赖
+                        for conditions, y in self.is_cover:
+                            if len(conditions) == 0:
+                                print('松弛函数依赖: d({}) <= {}'.format(y[0], y[1]))
+                            else:
+                                print('松弛函数依赖: {} --> {}'.format(
+                                    ['d({}) <= {}'.format(cond[0], cond[1]) for cond in conditions],
+                                    'd({}) <= {}'.format(y[0], y[1])))
+            if 'fd' in self.mining_constraints:         # 支持fd
                 with open(PROJECT_ROOT + '/constraints/rules/{}_fd.txt'.format(self.dataset), 'rb') as f:
                     self.fds = pickle.load(f)
                     print('{:=^80}'.format(' 读取数据集{}上的函数依赖 '.format(self.dataset.upper())))
                     print('约束数量: {}'.format(len(self.fds)))
-                    if verbose > 0:  # 输出时窗约束的形式
+                    if verbose > 0:  # 输出函数依赖的形式
                         for lhs, rhs in self.fds:
                             print('函数依赖: {} -> {}'.format([var[0] for var in lhs], rhs[0]))
         else:           # 否则需要挖掘规则
@@ -145,8 +191,18 @@ class MTS(object):
                     pickle.dump(self.stcds, f)  # pickle序列化时窗约束
             if 'crr' in self.mining_constraints:    # 支持crr
                 pass
-            if 'rfd' in self.mining_constraints:    # 支持rfd
-                pass
+            if 'domino' in self.mining_constraints:    # 支持rfd
+                self.domino = domino_mining_rfd(self, n=self.len, m=self.rfd_m, verbose=verbose)
+                with open(PROJECT_ROOT + '/constraints/rules/{}_rfd_domino.txt'.format(self.dataset), 'wb') as f:
+                    pickle.dump(self.domino, f)  # pickle序列化函数依赖
+            if 'cords' in self.mining_constraints:     # 支持rfd
+                self.cords = cords_mining_rfd(self, n=self.len, m=self.rfd_m, verbose=verbose)
+                with open(PROJECT_ROOT + '/constraints/rules/{}_rfd_cords.txt'.format(self.dataset), 'wb') as f:
+                    pickle.dump(self.cords, f)  # pickle序列化函数依赖
+            if 'is_cover' in self.mining_constraints:     # 支持rfd
+                self.is_cover = is_cover_mining_rfd(self, n=self.len, m=self.rfd_m, verbose=verbose)
+                with open(PROJECT_ROOT + '/constraints/rules/{}_rfd_is_cover.txt'.format(self.dataset), 'wb') as f:
+                    pickle.dump(self.is_cover, f)  # pickle序列化函数依赖
             if 'fd' in self.mining_constraints:     # 支持fd
                 self.fds = read_from_TANE(self, verbose=verbose)
                 with open(PROJECT_ROOT + '/constraints/rules/{}_fd.txt'.format(self.dataset), 'wb') as f:
@@ -244,10 +300,10 @@ if __name__ == '__main__':
     # 实验参数
     w = 2
 
-    idf = MTS('idf', 'timestamp', True, size=5000, verbose=1)                      # 读取数据集
-    # idf.constraints_mining(mining_constraints=['fd'], w=w, verbose=1)             # 挖掘约束
-    idf.constraints_mining(mining_constraints=['fd'], pre_mined=True, verbose=1)    # 预配置约束集合
-    idf.insert_error(snr=15, verbose=1)                                             # 注入噪声
+    idf = MTS('idf', 'timestamp', True, size=500, verbose=1)                      # 读取数据集
+    idf.constraints_mining(mining_constraints=['is_cover'], w=w, verbose=1)             # 挖掘约束
+    # idf.constraints_mining(pre_mined=True, verbose=1)    # 预配置约束集合
+    idf.insert_error(snr=15, verbose=1)                                           # 注入噪声
 
     # 速度约束Local修复
     # speed_local_modified, speed_local_is_modified, speed_local_time = speed_local(idf, w=w)
@@ -305,8 +361,15 @@ if __name__ == '__main__':
     # print('修复值与正确值平均误差: {:.4g}'.format(delta(func_lp_modified, idf.clean)))
     # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, func_lp_modified)))
 
-    # func-mvc修复
-    # func_mvc_modified, func_mvc_is_modified, func_mvc_time = func_mvc(idf, w=w)
+    # func-mvc修复base
+    # func_mvc_modified, func_mvc_is_modified, func_mvc_time = func_mvc(idf, w=w, mvc='base')
+    # print('{:=^80}'.format(' func-MVC修复数据集{} '.format(idf.dataset.upper())))
+    # print('修复用时: {:.4g}ms'.format(func_mvc_time))
+    # print('修复值与正确值平均误差: {:.4g}'.format(delta(func_mvc_modified, idf.clean)))
+    # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, func_mvc_modified)))
+
+    # func-mvc修复sorted
+    # func_mvc_modified, func_mvc_is_modified, func_mvc_time = func_mvc(idf, w=w, mvc='sorted')
     # print('{:=^80}'.format(' func-MVC修复数据集{} '.format(idf.dataset.upper())))
     # print('修复用时: {:.4g}ms'.format(func_mvc_time))
     # print('修复值与正确值平均误差: {:.4g}'.format(delta(func_mvc_modified, idf.clean)))
@@ -316,3 +379,9 @@ if __name__ == '__main__':
     # idf.origin.plot(subplots=True, figsize=(10, 10))
     # func_lp_modified.plot(subplots=True, figsize=(10, 10))
     # plt.show()
+
+    # fd_modified, fd_is_modified, fd_time = fd_detect(idf)
+    # fd_p, fd_r, fd_f1 = f1(fd_is_modified, idf.isDirty)
+    # print('{:=^80}'.format(' 函数依赖FD检测数据集{} '.format(idf.dataset.upper())))
+    # print('检测用时: {:.4g}ms'.format(fd_time))
+    # print('Precision: {:.4g}, Recall: {:.4g}, F1: {:.4g}'.format(fd_p, fd_r, fd_f1))
