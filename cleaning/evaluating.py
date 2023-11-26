@@ -2,8 +2,10 @@ import numpy as np
 import pandas as pd
 import warnings
 
-from cleaning.benchmark import delta, raa, f1, speed_local, speed_global, acc_local, acc_global, IMR, ewma, median_filter, \
+from cleaning.benchmark import delta, raa, f1, speed_local, speed_global, acc_local, acc_global, IMR, ewma, \
+    median_filter, \
     func_lp, func_mvc
+from cleaning.benchmark import fd_detect, rfd_detect
 from dataset.mts import MTS
 from utils import project_root
 
@@ -19,15 +21,20 @@ func_dict = {
     'EWMA': ewma,
     'Median': median_filter,
     'Func_LP': func_lp,
-    'Func_MVC': func_mvc
+    'Func_MVC': func_mvc,
+    'fd': fd_detect,
+    'domino': rfd_detect,
+    'cords': rfd_detect,
+    'is_cover': rfd_detect
 }
 
 
 def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=True, w=2,
-                          lens=range(2000, 20000+1, 2000), ratios=np.arange(0.05, 0.35+0.01, 0.05),
+                          lens=range(2000, 20000 + 1, 2000), ratios=np.arange(0.05, 0.35 + 0.01, 0.05),
                           constraints=None, methods=None):
     if methods is None:
-        methods = ['Func_MVC', 'Func_LP', 'EWMA', 'Speed(G)', 'Speed+Acc(G)', 'Median', 'IMR', 'Speed(L)', 'Speed+Acc(L)']
+        methods = ['Func_MVC', 'Func_LP', 'EWMA', 'Speed(G)', 'Speed+Acc(G)', 'Median', 'IMR', 'Speed(L)',
+                   'Speed+Acc(L)']
     if constraints is None:
         constraints = ['speed', 'acc', 'stcd']
 
@@ -186,9 +193,124 @@ def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=T
 
 
 def fd_and_rfd(dataset='idf', index_col='timestamp', datetime_index=True,
-                          lens=range(2000, 20000+1, 2000), ratios=np.arange(0.05, 0.35+0.01, 0.05)):
-    pass
+               lens=range(2000, 20000 + 1, 2000), ratios=np.arange(0.05, 0.35 + 0.01, 0.05),
+               methods=None):
+    if methods is None:
+        methods = ['fd', 'domino', 'cords', 'is_cover']
+
+    len_time_performance = pd.DataFrame(
+        columns=['data_len'] + [func_name for func_name in methods]
+    )
+    len_precision_performance = pd.DataFrame(
+        columns=['data_len'] + [func_name for func_name in methods]
+    )
+    len_recall_performance = pd.DataFrame(
+        columns=['data_len'] + [func_name for func_name in methods]
+    )
+    len_f1_performance = pd.DataFrame(
+        columns=['data_len'] + [func_name for func_name in methods]
+    )
+
+    idx = 0
+
+    for data_len in lens:
+        mts = MTS(dataset, index_col, datetime_index, data_len, verbose=1)
+        mts.constraints_mining(pre_mined=True, mining_constraints=['fd', 'domino', 'cords', 'is_cover'], verbose=1)
+        mts.insert_error(ratio=0.2, snr=15, verbose=1)
+
+        times = []
+        ps = []
+        rs = []
+        fs = []
+
+        # 对测试列表中的所有方法都执行测试
+        for method in methods:
+            if method in ['domino', 'cords', 'is_cover']:
+                modified, is_modified, time = func_dict[method](mts, method)
+            else:
+                modified, is_modified, time = func_dict[method](mts)
+
+            p, r, f = f1(is_modified, mts.isDirty[:, mts.rfd_m])
+
+            times.append(time)
+            ps.append(p)
+            rs.append(r)
+            fs.append(f)
+
+            print('{:=^80}'.format(' {}检测数据集{} '.format(method, mts.dataset.upper())))
+            print('检测用时: {:.4g}ms'.format(time))
+            print('Precision: {:.4g}, Recall: {:.4g}, F1: {:.4g}'.format(p, r, f))
+
+        # 记录实验结果
+        len_time_performance.loc[idx] = [data_len] + times
+        len_precision_performance.loc[idx] = [data_len] + ps
+        len_recall_performance.loc[idx] = [data_len] + rs
+        len_f1_performance.loc[idx] = [data_len] + fs
+
+        idx += 1
+
+    # ratio_time_performance = pd.DataFrame(
+    #     columns=['data_len'] + [func_name for func_name in methods]
+    # )
+    # ratio_precision_performance = pd.DataFrame(
+    #     columns=['data_len'] + [func_name for func_name in methods]
+    # )
+    # ratio_recall_performance = pd.DataFrame(
+    #     columns=['data_len'] + [func_name for func_name in methods]
+    # )
+    # ratio_f1_performance = pd.DataFrame(
+    #     columns=['data_len'] + [func_name for func_name in methods]
+    # )
+    #
+    # idx = 0
+    #
+    # for error_ratio in ratios:
+    #     mts = MTS(dataset, index_col, datetime_index, 1000, verbose=1)
+    #     mts.constraints_mining(pre_mined=True, mining_constraints=['fd', 'domino', 'cords', 'is_cover'], verbose=1)
+    #     mts.insert_error(ratio=error_ratio, snr=15, verbose=1)
+    #
+    #     times = []
+    #     ps = []
+    #     rs = []
+    #     fs = []
+    #
+    #     # 对测试列表中的所有方法都执行测试
+    #     for method in methods:
+    #         if method in ['domino', 'cords', 'is_cover']:
+    #             modified, is_modified, time = func_dict[method](mts, method)
+    #         else:
+    #             modified, is_modified, time = func_dict[method](mts)
+    #
+    #         p, r, f = f1(is_modified, mts.isDirty)
+    #
+    #         times.append(time)
+    #         ps.append(p)
+    #         rs.append(r)
+    #         fs.append(f)
+    #
+    #         print('{:=^80}'.format(' {}检测数据集{} '.format(method, mts.dataset.upper())))
+    #         print('检测用时: {:.4g}ms'.format(time))
+    #         print('Precision: {:.4g}, Recall: {:.4g}, F1: {:.4g}'.format(p, r, f))
+    #
+    #     ratio_time_performance.loc[idx] = [error_ratio] + times
+    #     ratio_precision_performance.loc[idx] = [error_ratio] + ps
+    #     ratio_recall_performance.loc[idx] = [error_ratio] + rs
+    #     ratio_f1_performance.loc[idx] = [error_ratio] + fs
+    #
+    #     idx += 1
+    #
+        # 保存数据
+        len_time_performance.to_csv(PROJECT_ROOT + '/detect_{}_len_time.csv'.format(dataset.upper()), index=False)
+        len_precision_performance.to_csv(PROJECT_ROOT + '/detect_{}_len_precision.csv'.format(dataset.upper()), index=False)
+        len_recall_performance.to_csv(PROJECT_ROOT + '/detect_{}_len_recall.csv'.format(dataset.upper()), index=False)
+        len_f1_performance.to_csv(PROJECT_ROOT + '/detect_{}_len_f1.csv'.format(dataset.upper()), index=False)
+    #
+    #     ratio_time_performance.to_csv(PROJECT_ROOT + '/detect_{}_ratio_time.csv'.format(dataset.upper()), index=False)
+    #     ratio_precision_performance.to_csv(PROJECT_ROOT + '/detect_{}_ratio_precision.csv'.format(dataset.upper()), index=False)
+    #     ratio_recall_performance.to_csv(PROJECT_ROOT + '/detect_{}_ratio_recall.csv'.format(dataset.upper()), index=False)
+    #     ratio_f1_performance.to_csv(PROJECT_ROOT + '/detect_{}_ratio_f1.csv'.format(dataset.upper()), index=False)
 
 
 if __name__ == '__main__':
-    benchmark_performance(lens=range(2000, 20000 + 1, 2000), ratios=np.arange(0.05, 0.35 + 0.01, 0.05))
+    # benchmark_performance(lens=range(2000, 20000 + 1, 2000), ratios=np.arange(0.05, 0.35 + 0.01, 0.05))
+    fd_and_rfd(lens=range(100, 500 + 1, 100), ratios=np.arange(0.05, 0.05 + 0.01, 0.05))

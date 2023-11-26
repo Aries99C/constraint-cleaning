@@ -17,18 +17,22 @@ def getDistanceRelation(r):
 
 
 def orderedRelation(diff_list, i):
+    diff_list=diff_list[:int(len(diff_list)/10)]
     return diff_list[np.argsort(diff_list[:, i])]
 
 
 def dominate(t_beta, diff_list_a):
+    cnt = 1
+    if len(t_beta)==0:
+        return False
     for h in t_beta:
-        flag = True
         for j in range(len(h)):
+            cnt += 1
             if h[j] > diff_list_a[j]:
-                flag = False
-        if flag:
-            return True
-    return False
+                return False
+            if cnt == 1000:
+                return False
+    return True
 
 
 def getTRel(diff_list_a, i):
@@ -44,6 +48,7 @@ def getTRel(diff_list_a, i):
             if dominate(t_beta, diff_list_a[j]):
                 continue
             t_beta.append(diff_list_a[j])
+
         t.append((t_beta, (i, diff_list_a[beta][i])))
         w = beta
         step = step * 2
@@ -78,7 +83,7 @@ def generateRFDcs(t_beta, w, lhs):
         lhs_now = []
         for i in cc:
             if i == cc[0]:
-                lhs_now.append([i, w[i] - 0.001])
+                lhs_now.append([i, max(w[i] - 0.001,0)])
                 continue
             lhs_now.append([i, w[i]])
         for j in range(1, len(cc)):
@@ -105,22 +110,29 @@ def generateRFDcs(t_beta, w, lhs):
                 kk = min(kk, t_beta[i][cc[j]])
             if kk == 99999999:
                 continue
-            lhs_now[j][1] = kk - 0.001
+            lhs_now[j][1] = max(kk - 0.001,0)
         rfd_cs.append(lhs_now)
     return rfd_cs
 
+def my_same(x,y):
+    if len(x)!=len(y):
+        return False
+    for i in range(len(x)):
+        if x[i]!=y[i]:
+            return False
+    return True
 
 def getRFDs(t_beta, a_i, w):
     L = 1
     levelAttr = []
     LHS = []
     DM = []
-    for i in t_beta:
-        if i.all() == w.all():
-            continue
+    cnt=len(t_beta)
+    for i in range(len(t_beta)):
+        x=t_beta[i]
         kk = []
         for j in range(len(w)):
-            kk.append(i[j] - w[j])
+            kk.append(x[j] - w[j])
         DM.append(kk)
     for i in range(len(w)):
         if i == a_i:
@@ -158,8 +170,8 @@ def Domino(r):
             for w in T_beta:
                 LHS_now = getRFDs(T_beta, i, w)
                 for kk in LHS_now:
-                    cnt += 1
-                    if cnt & 10 == 10:
+                    cnt+=1
+                    if cnt&10==10:
                         RFDcs.append((kk, RHS))
     return RFDcs
 
@@ -184,7 +196,6 @@ def mine(distance, mts):
             conditions.append((mts.cols[j[0]], j[1]))  # 每个条件X的形式为：(属性, 属性在元组间允许的差值范围)
         # 映射Y
         y = (mts.cols[i[1][0]], i[1][1])
-        rfds.append((conditions, y))
 
         # 判断RFD重复
         duplicate = False
@@ -221,6 +232,8 @@ def domino_mining_rfd(mts, n=100, m=10, verbose=0):
             if len(conditions) == 0:
                 print('松弛函数依赖: d({}) <= {:.3f}'.format(y[0], y[1]))
             else:
-                print('松弛函数依赖: {} --> {}'.format(['d({}) <= {:.3f}'.format(cond[0], cond[1]) for cond in conditions], 'd({}) <= {:.3f}'.format(y[0], y[1])))
+                print('松弛函数依赖: {} --> {}'.format(
+                    ['d({}) <= {:.3f}'.format(cond[0], cond[1]) for cond in conditions],
+                    'd({}) <= {:.3f}'.format(y[0], y[1])))
 
     return rfds

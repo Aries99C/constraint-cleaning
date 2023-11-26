@@ -33,7 +33,7 @@ class MTS(object):
     2. 挖掘并存储数据集中的置信度高的约束，包括：否定约束、速度约束、加速度约束、方差约束、行列约束
     """
 
-    def __init__(self, dataset='idf', index_col='timestamp', datetime_index=True, size=5000, verbose=0):
+    def __init__(self, dataset='idf', index_col='timestamp', datetime_index=True, size=5000, rfd_m=10, verbose=0):
         """
         初始化多元时序数据集，读取数据集并以最通用的DataFrame类型存储
         :param dataset: 数据集名称标识
@@ -64,7 +64,7 @@ class MTS(object):
         self.cords = None               # CORDS挖掘RFD
         self.is_cover = None            # IsCover挖掘RFD
 
-        self.rfd_m = 10                 # RFD挖掘和检测时使用的列数
+        self.rfd_m = rfd_m              # RFD挖掘和检测时使用的列数
 
         assert dataset in DATASETS.keys()   # 保证使用了预设的数据集，请在__init__.py文件中配置
 
@@ -99,7 +99,7 @@ class MTS(object):
         :param verbose: 日志显示
         """
         if mining_constraints is None:
-            self.mining_constraints = ['speed', 'acc', 'stcd', 'fd']  # 默认挖掘的约束
+            self.mining_constraints = ['speed', 'acc', 'stcd']  # 默认挖掘的约束
         else:
             self.mining_constraints = mining_constraints        # 自定义约束
         if pre_mined:   # 使用预先挖掘好的规则，直接读取即可
@@ -130,44 +130,44 @@ class MTS(object):
             if 'crr' in self.mining_constraints:        # 支持crr
                 pass
             if 'domino' in self.mining_constraints:     # 支持rfd
-                with open(PROJECT_ROOT + '/constraints/rules/{}_fd_domino.txt'.format(self.dataset), 'rb') as f:
+                with open(PROJECT_ROOT + '/constraints/rules/{}_rfd_domino.txt'.format(self.dataset), 'rb') as f:
                     self.domino = pickle.load(f)
                     print('{:=^80}'.format(' 读取数据集{}上的松弛函数依赖-Domino '.format(self.dataset.upper())))
                     print('约束数量: {}'.format(len(self.domino)))
                     if verbose > 0: # 输出松弛函数依赖
                         for conditions, y in self.domino:
                             if len(conditions) == 0:
-                                print('松弛函数依赖: d({}) <= {}'.format(y[0], y[1]))
+                                print('松弛函数依赖: d({}) <= {:.3f}'.format(y[0], y[1]))
                             else:
                                 print('松弛函数依赖: {} --> {}'.format(
-                                    ['d({}) <= {}'.format(cond[0], cond[1]) for cond in conditions],
-                                    'd({}) <= {}'.format(y[0], y[1])))
+                                    ['d({}) <= {:.3f}'.format(cond[0], cond[1]) for cond in conditions],
+                                    'd({}) <= {:.3f}'.format(y[0], y[1])))
             if 'cords' in self.mining_constraints:     # 支持rfd
-                with open(PROJECT_ROOT + '/constraints/rules/{}_fd_cords.txt'.format(self.dataset), 'rb') as f:
+                with open(PROJECT_ROOT + '/constraints/rules/{}_rfd_cords.txt'.format(self.dataset), 'rb') as f:
                     self.cords = pickle.load(f)
                     print('{:=^80}'.format(' 读取数据集{}上的松弛函数依赖-CORDS '.format(self.dataset.upper())))
                     print('约束数量: {}'.format(len(self.cords)))
                     if verbose > 0: # 输出松弛函数依赖
                         for conditions, y in self.cords:
                             if len(conditions) == 0:
-                                print('松弛函数依赖: d({}) <= {}'.format(y[0], y[1]))
+                                print('松弛函数依赖: d({}) <= {:.3f}'.format(y[0], y[1]))
                             else:
                                 print('松弛函数依赖: {} --> {}'.format(
-                                    ['d({}) <= {}'.format(cond[0], cond[1]) for cond in conditions],
-                                    'd({}) <= {}'.format(y[0], y[1])))
+                                    ['d({}) <= {:.3f}'.format(cond[0], cond[1]) for cond in conditions],
+                                    'd({}) <= {:.3f}'.format(y[0], y[1])))
             if 'is_cover' in self.mining_constraints:     # 支持rfd
-                with open(PROJECT_ROOT + '/constraints/rules/{}_fd_is_cover.txt'.format(self.dataset), 'rb') as f:
+                with open(PROJECT_ROOT + '/constraints/rules/{}_rfd_is_cover.txt'.format(self.dataset), 'rb') as f:
                     self.is_cover = pickle.load(f)
                     print('{:=^80}'.format(' 读取数据集{}上的松弛函数依赖-IsCover '.format(self.dataset.upper())))
                     print('约束数量: {}'.format(len(self.is_cover)))
                     if verbose > 0: # 输出松弛函数依赖
                         for conditions, y in self.is_cover:
                             if len(conditions) == 0:
-                                print('松弛函数依赖: d({}) <= {}'.format(y[0], y[1]))
+                                print('松弛函数依赖: d({}) <= {:.3f}'.format(y[0], y[1]))
                             else:
                                 print('松弛函数依赖: {} --> {}'.format(
-                                    ['d({}) <= {}'.format(cond[0], cond[1]) for cond in conditions],
-                                    'd({}) <= {}'.format(y[0], y[1])))
+                                    ['d({}) <= {:.3f}'.format(cond[0], cond[1]) for cond in conditions],
+                                    'd({}) <= {:.3f}'.format(y[0], y[1])))
             if 'fd' in self.mining_constraints:         # 支持fd
                 with open(PROJECT_ROOT + '/constraints/rules/{}_fd.txt'.format(self.dataset), 'rb') as f:
                     self.fds = pickle.load(f)
@@ -175,7 +175,7 @@ class MTS(object):
                     print('约束数量: {}'.format(len(self.fds)))
                     if verbose > 0:  # 输出函数依赖的形式
                         for lhs, rhs in self.fds:
-                            print('函数依赖: {} -> {}'.format([var[0] for var in lhs], rhs[0]))
+                            print('函数依赖: {} -> {}'.format([var[0] for var in lhs], [var[0] for var in rhs]))
         else:           # 否则需要挖掘规则
             if 'speed' in self.mining_constraints:  # 支持速度约束
                 self.speed_constraints = mining_speed_constraints(self, alpha=3, verbose=verbose)
@@ -300,10 +300,10 @@ if __name__ == '__main__':
     # 实验参数
     w = 2
 
-    idf = MTS('idf', 'timestamp', True, size=500, verbose=1)                      # 读取数据集
-    idf.constraints_mining(mining_constraints=['is_cover'], w=w, verbose=1)             # 挖掘约束
+    idf = MTS('idf', 'timestamp', True, size=100, verbose=1)                     # 读取数据集
+    idf.constraints_mining(mining_constraints=['domino'], w=w, verbose=1)             # 挖掘约束
     # idf.constraints_mining(pre_mined=True, verbose=1)    # 预配置约束集合
-    idf.insert_error(snr=15, verbose=1)                                           # 注入噪声
+    # idf.insert_error(snr=15, verbose=1)                                           # 注入噪声
 
     # 速度约束Local修复
     # speed_local_modified, speed_local_is_modified, speed_local_time = speed_local(idf, w=w)

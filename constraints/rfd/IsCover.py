@@ -67,6 +67,8 @@ def my_contain(x, y):
 '''
 
 
+def orderedRelation(diff_list, i):
+    return diff_list[np.argsort(diff_list[:, i])]
 def fd_ok(op):
     ok = [[False] * len(op)] * len(op)  # ok[i][j] 表示i 和 j两个能否同时出现
     for i in range(len(op)):
@@ -156,6 +158,7 @@ def fd_LHS(op, RHS):  # 采用BFS的方法挑选LHS候选
                 continue
             tail += 1
             queue.append([cnt, al_cover_col | (1 << i), i + 1])
+
     return ans
 
 
@@ -166,16 +169,30 @@ def reduce(li):  # 二进制转化为数组
         res.append(bit_to_list(i))
     return res
 
+def dominate(t_beta, diff_list_a):
+    if len(t_beta)==0:
+        return False
+    cnt=1
+    for h in t_beta:
+        for j in range(len(h)):
+            cnt+=1
+            if h[j] > diff_list_a[j]:
+                return False
+            if cnt==1000:
+                return True
+    return True
 
-def gen_LHS(data, RHS, RHSv):
-    beta_1 = [x for x in data if x[RHS] <= RHSv]
-    beta_2 = [x for x in data if x[RHS] > RHSv]
+def gen_LHS(beta_1,beta_2,RHS):
+
     min_value = []
+    import time
+    Start=time.time()
     for j in range(len(beta_1[0])):
         maxn = 0
         for i in range(len(beta_1)):
             maxn = max(maxn, beta_1[i][j])
         min_value.append(maxn)
+    End=time.time()
     op = [[] for i in range(len(beta_1[0]))]
     for i in beta_2:
         for j in range(len(i)):
@@ -183,7 +200,6 @@ def gen_LHS(data, RHS, RHSv):
                 op[j].append(0)
             else:
                 op[j].append(1)
-
     res = fd_LHS(op, RHS)
     res = reduce(res)
     return res
@@ -204,26 +220,38 @@ def bit_to_list(t):
             S.append(cnt)
     return S
 
-
 def generte(data):
     res = []
+    data_new=[]
+    for i in data:
+        if dominate(data_new, i):
+            continue
+        data_new.append(i)
+    data=np.array(data_new)
     for i in range(len(data[0])):
+        diff_list_a = orderedRelation(data, i)
         df = [data[ll][i] for ll in range(len(data))]
         df = list(set(df))
         df.sort()
         p = len(df) - 1
         step = 1
+        beta1=diff_list_a
+        beta2=[]
         while p >= 0:
-
             k = df[p]
-            LHS_list = gen_LHS(data, i, k)
+            while len(beta1)!=0 and beta1[len(beta1)-1][i]>df[p]:
+                x=beta1[len(beta1)-1]
+                beta1=beta1[:len(beta1)-1]
+                beta2.append(x)
+
+            LHS_list = gen_LHS(beta1,beta2, i)
             for j in LHS_list:
                 now_FD = FD(j, i)
                 new_RFD = RFD(now_FD, k)
                 new_RFD.generator(data)
                 res.append(new_RFD)
             p = p - step
-            '''step *= 2'''
+            step *= 2
     return res
 
 
@@ -275,7 +303,7 @@ def is_cover_mining_rfd(mts, n=100, m=10, verbose=0):
     # 读取部分数据
     distance, name_list = pre_glass(mts, n, m)
     # 挖掘规则
-    rfds = mine(distance, name_list)
+    rfds = mine(distance, mts)
 
     if verbose > 0:
         print('{:=^80}'.format(' 在数据集{}上挖掘松弛函数依赖-CORDS '.format(mts.dataset.upper())))

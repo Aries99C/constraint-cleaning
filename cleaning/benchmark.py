@@ -669,6 +669,9 @@ def fd_detect(mts):
     is_modified = mts.isModified.copy(deep=True)  # 拷贝修复单元格信息
     time_cost = 0.  # 时间成本
 
+    modified = modified[:, mts.rfd_m]
+    is_modified = is_modified[:, mts.rfd_m]
+
     # 由于FD挖掘时无法识别浮点数，需要将数据修改为整形
     for col in modified.columns:
         # 乘100后四舍五入
@@ -698,6 +701,51 @@ def fd_detect(mts):
                             for col_, idx_ in lhs:
                                 is_modified[col_].values[i] = True
                                 is_modified[col_].values[j] = True
+
+    time_cost += time.perf_counter() - start
+
+    return modified, is_modified, time_cost
+
+
+def rfd_detect(mts, method='is_cover'):
+    modified = mts.modified.copy(deep=True)  # 拷贝数据
+    is_modified = mts.isModified.copy(deep=True)  # 拷贝修复单元格信息
+    time_cost = 0.  # 时间成本
+
+    modified = modified[:, mts.rfd_m]
+    is_modified = is_modified[:, mts.rfd_m]
+
+    # 开始检测
+    start = time.perf_counter()
+
+    rfds = None
+    if method == 'is_cover':
+        rfds = mts.is_cover
+    if method == 'domino':
+        rfds = mts.domino
+    if method == 'cords':
+        rfds = mts.cords
+
+    for conditions, y in rfds:
+        # 先判断是否有条件，有条件才需要判断
+        if len(conditions) > 0:
+            for i in range(mts.len):
+                for j in range(i + 1, mts.len):
+                    # 获取元组
+                    t_i = modified.iloc[i]
+                    t_j = modified.iloc[j]
+                    # 比较两个元组条件的差值
+                    condition = True
+                    for col, threshold in conditions:
+                        if abs(t_i[col] - t_j[col]) > threshold:
+                            condition = False
+                            break
+                    if condition and abs(t_i[y[0]] - t_j[y[0]]) > y[1]:
+                        is_modified[y[0]].values[i] = True
+                        is_modified[y[0]].values[j] = True
+                        for col_, threshold_ in conditions:
+                            is_modified[col_].values[i] = True
+                            is_modified[col_].values[j] = True
 
     time_cost += time.perf_counter() - start
 
