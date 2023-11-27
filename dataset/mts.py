@@ -300,10 +300,10 @@ if __name__ == '__main__':
     # 实验参数
     w = 2
 
-    idf = MTS('idf', 'timestamp', True, size=100, verbose=1)                     # 读取数据集
-    idf.constraints_mining(mining_constraints=['domino'], w=w, verbose=1)             # 挖掘约束
-    # idf.constraints_mining(pre_mined=True, verbose=1)    # 预配置约束集合
-    # idf.insert_error(snr=15, verbose=1)                                           # 注入噪声
+    idf = MTS('SMD', 'Timestamp', False, size=4000, verbose=1)                     # 读取数据集
+    # idf.constraints_mining(w=w, verbose=1)             # 挖掘约束
+    idf.constraints_mining(pre_mined=True, verbose=1)                               # 预配置约束集合
+    idf.insert_error(snr=15, verbose=1)                                             # 注入噪声
 
     # 速度约束Local修复
     # speed_local_modified, speed_local_is_modified, speed_local_time = speed_local(idf, w=w)

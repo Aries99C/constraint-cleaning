@@ -32,3 +32,8 @@ def read_from_TANE(mts, verbose=0):
         for lhs, rhs in fd_list:
             print('函数依赖: {} -> {}'.format([var[0] for var in lhs], [var[0] for var in rhs]))
     return fd_list
+
+
+def mining_fd_TANE(mts, verbose=0):
+    # TODO
+    return read_from_TANE(mts, verbose)

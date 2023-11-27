@@ -9,7 +9,7 @@ if __name__ == '__main__':
         df[col] = df[col] * 100
         df[col] = df[col].astype(int)
 
-    df = df
+    df = df.iloc[:, :10]
 
     with open('idf_data.txt', 'w') as f:
         for line in df.values:

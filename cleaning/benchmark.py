@@ -9,7 +9,7 @@ from sklearn.metrics import precision_score, recall_score, f1_score
 
 
 def delta(a, b, aver=True):
-    df = a.sub(b)    # 两个mts相减
+    df = a.sub(b)  # 两个mts相减
     x = np.absolute(df.values)  # 获取ndarray的绝对值
     if aver:
         x = x / (df.shape[0] * df.shape[1])
@@ -20,11 +20,11 @@ def raa(origin, clean, modified):
     return 1 - delta(modified, clean) / (delta(origin, modified) + delta(origin, clean))
 
 
-def f1(is_modified, is_dirty):
+def f1(is_modified, is_dirty, average='binary'):
     a = is_modified.values.reshape(-1)
     b = is_dirty.values.reshape(-1)
 
-    p, r, f = precision_score(a, b), recall_score(a, b), f1_score(a, b)
+    p, r, f = precision_score(b, a, average=average), recall_score(b, a, average=average), f1_score(b, a, average=average)
 
     return p, r, f
 
@@ -44,11 +44,11 @@ def update_is_modified(mts, modified, is_modified):
 
 
 def speed_local(mts, w=10):
-    modified = mts.modified.copy(deep=True)         # 拷贝数据
-    is_modified = mts.isModified.copy(deep=True)    # 拷贝修复单元格信息
-    time_cost = 0.                                  # 时间成本
+    modified = mts.modified.copy(deep=True)  # 拷贝数据
+    is_modified = mts.isModified.copy(deep=True)  # 拷贝修复单元格信息
+    time_cost = 0.  # 时间成本
 
-    for col in modified.columns:    # 逐列修复
+    for col in modified.columns:  # 逐列修复
         # 获取当前列的速度约束上下界
         speed_lb = mts.speed_constraints[col][0]
         speed_ub = mts.speed_constraints[col][1]
@@ -82,11 +82,11 @@ def speed_local(mts, w=10):
 
 
 def speed_global(mts, w=10, x=20, overlapping_ratio=0.2):
-    modified = mts.modified.copy(deep=True)         # 拷贝数据
-    is_modified = mts.isModified.copy(deep=True)    # 拷贝修复单元格信息
-    time_cost = 0.                                  # 时间成本
+    modified = mts.modified.copy(deep=True)  # 拷贝数据
+    is_modified = mts.isModified.copy(deep=True)  # 拷贝修复单元格信息
+    time_cost = 0.  # 时间成本
 
-    for col in modified.columns:    # 逐列修复
+    for col in modified.columns:  # 逐列修复
         # 获取当前列的速度约束上下界
         speed_lb = mts.speed_constraints[col][0]
         speed_ub = mts.speed_constraints[col][1]
@@ -94,7 +94,7 @@ def speed_global(mts, w=10, x=20, overlapping_ratio=0.2):
         s = 0
         while s + x <= mts.len:
             # 获取窗口x内的数据
-            data = np.array(modified[col].values[s:min(s+x, mts.len)])
+            data = np.array(modified[col].values[s:min(s + x, mts.len)])
             # 构建线性规划问题
             start = time.perf_counter()
             c = np.ones(2 * data.shape[0])
@@ -122,7 +122,7 @@ def speed_global(mts, w=10, x=20, overlapping_ratio=0.2):
             b = np.array(b)
             # 求解
             res = linprog(c, A_ub=A, b_ub=b, bounds=bounds)
-            modified[col].values[s:min(s+x, mts.len)] = (res.x[:data.shape[0]] - res.x[data.shape[0]:]) + data
+            modified[col].values[s:min(s + x, mts.len)] = (res.x[:data.shape[0]] - res.x[data.shape[0]:]) + data
             s += int((1 - overlapping_ratio) * x)
 
             end = time.perf_counter()
@@ -135,11 +135,11 @@ def speed_global(mts, w=10, x=20, overlapping_ratio=0.2):
 
 
 def acc_local(mts, w=10):
-    modified = mts.modified.copy(deep=True)         # 拷贝数据
-    is_modified = mts.isModified.copy(deep=True)    # 拷贝修复单元格信息
-    time_cost = 0.                                  # 时间成本
+    modified = mts.modified.copy(deep=True)  # 拷贝数据
+    is_modified = mts.isModified.copy(deep=True)  # 拷贝修复单元格信息
+    time_cost = 0.  # 时间成本
 
-    for col in modified.columns:    # 逐列修复
+    for col in modified.columns:  # 逐列修复
         # 获取当前列的速度约束上下界
         speed_lb = mts.speed_constraints[col][0]
         speed_ub = mts.speed_constraints[col][1]
@@ -182,11 +182,11 @@ def acc_local(mts, w=10):
 
 
 def acc_global(mts, w=10, x=20, overlapping_ratio=0.2):
-    modified = mts.modified.copy(deep=True)         # 拷贝数据
-    is_modified = mts.isModified.copy(deep=True)    # 拷贝修复单元格信息
-    time_cost = 0.                                  # 时间成本
+    modified = mts.modified.copy(deep=True)  # 拷贝数据
+    is_modified = mts.isModified.copy(deep=True)  # 拷贝修复单元格信息
+    time_cost = 0.  # 时间成本
 
-    for col in modified.columns:    # 逐列修复
+    for col in modified.columns:  # 逐列修复
         # 获取当前列的速度约束上下界
         speed_lb = mts.speed_constraints[col][0]
         speed_ub = mts.speed_constraints[col][1]
@@ -197,7 +197,7 @@ def acc_global(mts, w=10, x=20, overlapping_ratio=0.2):
         s = 0
         while s + x <= mts.len:
             # 获取窗口x内的数据
-            data = np.array(modified[col].values[s:min(s+x, mts.len)])
+            data = np.array(modified[col].values[s:min(s + x, mts.len)])
             # 构建线性规划问题
             start = time.perf_counter()
             c = np.ones(2 * data.shape[0])
@@ -241,7 +241,7 @@ def acc_global(mts, w=10, x=20, overlapping_ratio=0.2):
             b = np.array(b)
             # 求解
             res = linprog(c, A_ub=A, b_ub=b, bounds=bounds)
-            modified[col].values[s:min(s+x, mts.len)] = (res.x[:data.shape[0]] - res.x[data.shape[0]:]) + data
+            modified[col].values[s:min(s + x, mts.len)] = (res.x[:data.shape[0]] - res.x[data.shape[0]:]) + data
             s += int((1 - overlapping_ratio) * x)
 
             end = time.perf_counter()
@@ -305,9 +305,9 @@ class IMR:
         return target_index
 
     def clean(self, mts):
-        modified = mts.modified.copy(deep=True)         # 拷贝数据
-        is_modified = mts.isModified.copy(deep=True)    # 拷贝修复单元格信息
-        time_cost = 0.                                  # 时间成本
+        modified = mts.modified.copy(deep=True)  # 拷贝数据
+        is_modified = mts.isModified.copy(deep=True)  # 拷贝修复单元格信息
+        time_cost = 0.  # 时间成本
 
         for col in modified.columns:
             # 获取标注信息
@@ -388,9 +388,9 @@ class IMR:
 
 
 def ewma(mts, beta=0.9):
-    modified = mts.modified.copy(deep=True)         # 拷贝数据
-    is_modified = mts.isModified.copy(deep=True)    # 拷贝修复单元格信息
-    time_cost = 0.                                  # 时间成本
+    modified = mts.modified.copy(deep=True)  # 拷贝数据
+    is_modified = mts.isModified.copy(deep=True)  # 拷贝修复单元格信息
+    time_cost = 0.  # 时间成本
 
     for col in modified.columns:
         data = modified[col].values
@@ -407,9 +407,9 @@ def ewma(mts, beta=0.9):
 
 
 def median_filter(mts, w=10):
-    modified = mts.modified.copy(deep=True)         # 拷贝数据
-    is_modified = mts.isModified.copy(deep=True)    # 拷贝修复单元格信息
-    time_cost = 0.                                  # 时间成本
+    modified = mts.modified.copy(deep=True)  # 拷贝数据
+    is_modified = mts.isModified.copy(deep=True)  # 拷贝修复单元格信息
+    time_cost = 0.  # 时间成本
 
     for col in modified.columns:
         data = modified[col].values
@@ -431,7 +431,7 @@ def func_lp(mts, w=2, size=20, overlapping_ratio=0.2):
     time_cost = 0.  # 时间成本
     success_cnt = 0
 
-    m = mts.dim     # 属性个数
+    m = mts.dim  # 属性个数
 
     s = 0
     while s + size <= mts.len:
@@ -453,7 +453,7 @@ def func_lp(mts, w=2, size=20, overlapping_ratio=0.2):
             # 时窗限制内约束
             for i in range(win):
                 for j in range(i + 1, win):
-                    if j > i + w:   # 只考虑时窗限制内的
+                    if j > i + w:  # 只考虑时窗限制内的
                         break
                     # 速度下界
                     b_lb = -s_lb * (j - i) + (data[j * m + idx] - data[i * m + idx])
@@ -482,10 +482,10 @@ def func_lp(mts, w=2, size=20, overlapping_ratio=0.2):
             # 对每个切片生成一组约束
             for i in range(win - w):
                 # 获取切片
-                t = data[i * m: (i+w) * m]
+                t = data[i * m: (i + w) * m]
 
                 # 根据y_pos将切片分为x和y
-                x = np.append(t[:y_pos], t[y_pos+1:]) if y_pos > 0 else t[y_pos+1:]
+                x = np.append(t[:y_pos], t[y_pos + 1:]) if y_pos > 0 else t[y_pos + 1:]
                 y = t[y_pos]
                 # 计算约束对应的系数A和b
                 # 将x'和y'都变成u和v：x'=x+(u-v), y'=y+(u-v);
@@ -493,7 +493,7 @@ def func_lp(mts, w=2, size=20, overlapping_ratio=0.2):
                 # 上界对应约束 Σ a_i * x'_i + b - y' <= ub
                 a_ub = np.zeros(2 * data.shape[0])  # 前一半是u_i的系数，后一半是v_i的系数
                 b_ub = ub + y - intercept
-                a_ub[i * m: (i+w) * m] = rule.alpha
+                a_ub[i * m: (i + w) * m] = rule.alpha
                 a_ub[i * m + data.shape[0]: (i + w) * m + data.shape[0]] = -rule.alpha
                 for j in range(len(t)):
                     b_ub -= rule.alpha[j] * t[j]
@@ -509,7 +509,7 @@ def func_lp(mts, w=2, size=20, overlapping_ratio=0.2):
         time_cost += end - start
 
         if res is not None:
-            modified.values[s:s+win] = ((res[:data.shape[0]] - res[data.shape[0]:]) + data).reshape(win, m)
+            modified.values[s:s + win] = ((res[:data.shape[0]] - res[data.shape[0]:]) + data).reshape(win, m)
         s += int((1 - overlapping_ratio) * size)
 
     # 根据差值判断数据是否被修复
@@ -609,7 +609,7 @@ def func_mvc(mts, w=2, size=20, mvc='base', overlapping_ratio=0.3):
         time_cost += end - start
 
         if res is not None:
-            modified.values[s:s+win] = ((res[:data.shape[0]] - res[data.shape[0]:]) + data).reshape(win, m)
+            modified.values[s:s + win] = ((res[:data.shape[0]] - res[data.shape[0]:]) + data).reshape(win, m)
         s += int((1 - overlapping_ratio) * size)
 
     # 根据差值判断数据是否被修复
@@ -619,9 +619,9 @@ def func_mvc(mts, w=2, size=20, mvc='base', overlapping_ratio=0.3):
 
 
 def violation_detect(hypergraph):
-    t, rules = hypergraph    # 解析超图
+    t, rules = hypergraph  # 解析超图
 
-    violation = []      # 约束违反情况
+    violation = []  # 约束违反情况
 
     for rule in rules:
         # 调用规则的违反程度分数计算
@@ -633,7 +633,7 @@ def violation_detect(hypergraph):
 
 
 def find_key_cell(violation, mvc='base'):
-    key_cell_pos = []   # 最终返回待清洗的关键变量
+    key_cell_pos = []  # 最终返回待清洗的关键变量
 
     pre_violation = None
 
@@ -669,8 +669,8 @@ def fd_detect(mts):
     is_modified = mts.isModified.copy(deep=True)  # 拷贝修复单元格信息
     time_cost = 0.  # 时间成本
 
-    modified = modified[:, mts.rfd_m]
-    is_modified = is_modified[:, mts.rfd_m]
+    modified = modified.iloc[:, :mts.rfd_m]
+    is_modified = is_modified.iloc[:, :mts.rfd_m]
 
     # 由于FD挖掘时无法识别浮点数，需要将数据修改为整形
     for col in modified.columns:
@@ -683,7 +683,7 @@ def fd_detect(mts):
 
     for lhs, rhs in mts.fds:
         for i in range(mts.len):
-            for j in range(i+1, mts.len):
+            for j in range(i + 1, mts.len):
                 t_i = modified.iloc[i]
                 t_j = modified.iloc[j]
                 # 判断两个元组的条件
@@ -712,8 +712,8 @@ def rfd_detect(mts, method='is_cover'):
     is_modified = mts.isModified.copy(deep=True)  # 拷贝修复单元格信息
     time_cost = 0.  # 时间成本
 
-    modified = modified[:, mts.rfd_m]
-    is_modified = is_modified[:, mts.rfd_m]
+    modified = modified.iloc[:, :mts.rfd_m]
+    is_modified = is_modified.iloc[:, :mts.rfd_m]
 
     # 开始检测
     start = time.perf_counter()
