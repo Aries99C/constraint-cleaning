@@ -16,7 +16,7 @@ from constraints.rfd.Domino import domino_mining_rfd
 from constraints.rfd.CORDS import cords_mining_rfd
 from constraints.rfd.IsCover import is_cover_mining_rfd
 
-from cleaning.benchmark import delta, raa, speed_local, speed_global, acc_local, acc_global, IMR, ewma, median_filter, func_lp, func_mvc
+from cleaning.benchmark import delta, raa, check_repair_violation, speed_local, speed_global, acc_local, acc_global, IMR, ewma, median_filter, func_lp, func_mvc
 from cleaning.benchmark import f1, fd_detect
 
 pd.set_option('display.max_rows', 20)
@@ -300,7 +300,12 @@ if __name__ == '__main__':
     # 实验参数
     w = 2
 
-    idf = MTS('SMD', 'Timestamp', False, size=4000, verbose=1)                     # 读取数据集
+    # idf = MTS('idf', 'timestamp', True, size=2000, verbose=1)                      # 读取数据集
+    # idf = MTS('SWaT', 'Timestamp', False, size=2000, verbose=1)
+    # idf = MTS('WADI', 'Row', False, size=2000, verbose=1)
+    idf = MTS('SMD', 'Timestamp', False, size=2000, verbose=1)
+    # idf = MTS('ASD', 'Timestamp', False, size=2000, verbose=1)
+
     # idf.constraints_mining(w=w, verbose=1)             # 挖掘约束
     idf.constraints_mining(pre_mined=True, verbose=1)                               # 预配置约束集合
     idf.insert_error(snr=15, verbose=1)                                             # 注入噪声
@@ -313,11 +318,12 @@ if __name__ == '__main__':
     # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, speed_local_modified)))
 
     # 速度约束Global修复
-    # speed_global_modified, speed_global_is_modified, speed_global_time = speed_global(idf, w=w, x=10)
-    # print('{:=^80}'.format(' 全局速度约束修复数据集{} '.format(idf.dataset.upper())))
-    # print('修复用时: {:.4g}ms'.format(speed_global_time))
-    # print('修复值与正确值平均误差: {:.4g}'.format(delta(speed_global_modified, idf.clean)))
-    # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, speed_global_modified)))
+    speed_global_modified, speed_global_is_modified, speed_global_time = speed_global(idf, w=w, x=10)
+    print('{:=^80}'.format(' 全局速度约束修复数据集{} '.format(idf.dataset.upper())))
+    print('修复用时: {:.4g}ms'.format(speed_global_time))
+    print('修复值与正确值平均误差: {:.4g}'.format(delta(speed_global_modified, idf.clean)))
+    print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, speed_global_modified)))
+    print('修复后约束违反率: {:.4g}'.format(check_repair_violation(speed_global_modified, idf.stcds, w)))
 
     # 速度约束+加速度约束Local修复
     # acc_local_modified, acc_local_is_modified, acc_local_time = acc_local(idf)
@@ -334,11 +340,12 @@ if __name__ == '__main__':
     # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, acc_global_modified)))
 
     # IMR修复
-    # imr_modified, imr_is_modified, imr_time = IMR(max_iter=1000).clean(idf)
-    # print('{:=^80}'.format(' IMR算法修复数据集{} '.format(idf.dataset.upper())))
-    # print('修复用时: {:.4g}ms'.format(imr_time))
-    # print('修复值与正确值平均误差: {:.4g}'.format(delta(imr_modified, idf.clean)))
-    # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, imr_modified)))
+    imr_modified, imr_is_modified, imr_time = IMR(max_iter=1000).clean(idf)
+    print('{:=^80}'.format(' IMR算法修复数据集{} '.format(idf.dataset.upper())))
+    print('修复用时: {:.4g}ms'.format(imr_time))
+    print('修复值与正确值平均误差: {:.4g}'.format(delta(imr_modified, idf.clean)))
+    print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, imr_modified)))
+    print('修复后约束违反率: {:.4g}'.format(check_repair_violation(imr_modified, idf.stcds, w)))
 
     # EWMA修复
     # ewma_modified, ewma_is_modified, ewma_time = ewma(idf, beta=0.9)
@@ -360,6 +367,7 @@ if __name__ == '__main__':
     # print('修复用时: {:.4g}ms'.format(func_lp_time))
     # print('修复值与正确值平均误差: {:.4g}'.format(delta(func_lp_modified, idf.clean)))
     # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, func_lp_modified)))
+    # print('修复后约束违反率: {:.4g}'.format(check_repair_violation(func_lp_modified, idf.stcds, w)))
 
     # func-mvc修复base
     # func_mvc_modified, func_mvc_is_modified, func_mvc_time = func_mvc(idf, w=w, mvc='base')
@@ -369,11 +377,12 @@ if __name__ == '__main__':
     # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, func_mvc_modified)))
 
     # func-mvc修复sorted
-    # func_mvc_modified, func_mvc_is_modified, func_mvc_time = func_mvc(idf, w=w, mvc='sorted')
-    # print('{:=^80}'.format(' func-MVC修复数据集{} '.format(idf.dataset.upper())))
-    # print('修复用时: {:.4g}ms'.format(func_mvc_time))
-    # print('修复值与正确值平均误差: {:.4g}'.format(delta(func_mvc_modified, idf.clean)))
-    # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, func_mvc_modified)))
+    func_mvc_modified, func_mvc_is_modified, func_mvc_time = func_mvc(idf, w=w, mvc='sorted')
+    print('{:=^80}'.format(' func-MVC修复数据集{} '.format(idf.dataset.upper())))
+    print('修复用时: {:.4g}ms'.format(func_mvc_time))
+    print('修复值与正确值平均误差: {:.4g}'.format(delta(func_mvc_modified, idf.clean)))
+    print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, func_mvc_modified)))
+    print('修复后约束违反率: {:.4g}'.format(check_repair_violation(func_mvc_modified, idf.stcds, w)))
 
     # idf.clean.plot(subplots=True, figsize=(10, 10))
     # idf.origin.plot(subplots=True, figsize=(10, 10))

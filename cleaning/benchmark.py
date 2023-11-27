@@ -29,6 +29,21 @@ def f1(is_modified, is_dirty, average='binary'):
     return p, r, f
 
 
+def check_repair_violation(modified, rules, w):
+    slices = array2window(df2array(modified), w)
+
+    violation_rate = 0.
+
+    for t in slices:
+        for rule in rules:
+            score = rule.violation_degree(t)
+            violation_rate += score
+
+    violation_rate /= (len(modified) * len(modified.columns))
+
+    return violation_rate
+
+
 def df2array(df):
     d = df.copy(deep=True)  # 拷贝值
     return d.values  # 将Dataframe转换为ndarray类型
@@ -519,7 +534,7 @@ def func_lp(mts, w=2, size=20, overlapping_ratio=0.2):
     return modified, is_modified, time_cost
 
 
-def func_mvc(mts, w=2, size=20, mvc='base', overlapping_ratio=0.3):
+def func_mvc(mts, w=2, size=20, mvc='sorted', overlapping_ratio=0.3):
     modified = mts.modified.copy(deep=True)  # 拷贝数据
     is_modified = mts.isModified.copy(deep=True)  # 拷贝修复单元格信息
     time_cost = 0.  # 时间成本
@@ -632,7 +647,7 @@ def violation_detect(hypergraph):
     return violation
 
 
-def find_key_cell(violation, mvc='base'):
+def find_key_cell(violation, mvc='sorted'):
     key_cell_pos = []  # 最终返回待清洗的关键变量
 
     pre_violation = None

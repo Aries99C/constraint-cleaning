@@ -4,7 +4,7 @@ import warnings
 
 from cleaning.benchmark import delta, raa, f1, speed_local, speed_global, acc_local, acc_global, IMR, ewma, \
     median_filter, \
-    func_lp, func_mvc
+    func_lp, func_mvc, check_repair_violation
 from cleaning.benchmark import fd_detect, rfd_detect
 from dataset.mts import MTS
 from utils import project_root
@@ -57,6 +57,9 @@ def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=T
     len_f1_performance = pd.DataFrame(
         columns=['data_len'] + [func_name for func_name in methods]
     )
+    len_vio_performance = pd.DataFrame(
+        columns=['data_len'] + [func_name for func_name in methods]
+    )
 
     idx = 0
 
@@ -71,6 +74,7 @@ def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=T
         ps = []
         rs = []
         fs = []
+        vios = []
 
         # 对测试列表中的所有方法都执行测试
         for method in methods:
@@ -84,6 +88,7 @@ def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=T
             error = delta(modified, mts.clean) / mts.delta_clean_origin()
             raa_score = raa(mts.origin, mts.clean, modified)
             p, r, f = f1(is_modified, mts.isDirty)
+            vio_rate = check_repair_violation(modified, mts.stcds, w)
 
             errors.append(error)
             raas.append(raa_score)
@@ -91,11 +96,13 @@ def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=T
             ps.append(p)
             rs.append(r)
             fs.append(f)
+            vios.append(vio_rate)
 
             print('{:=^80}'.format(' {}修复数据集{} '.format(method, mts.dataset.upper())))
             print('修复用时: {:.4g}ms'.format(time))
             print('修复误差比: {:.4g}'.format(error))
             print('修复相对精度: {:.4g}'.format(raa_score))
+            print('修复后约束违反率: {:.4g}'.format(check_repair_violation(modified, mts.stcds, w)))
 
         # 记录实验结果
         len_error_performance.loc[idx] = [data_len] + errors
@@ -104,33 +111,37 @@ def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=T
         len_precision_performance.loc[idx] = [data_len] + ps
         len_recall_performance.loc[idx] = [data_len] + rs
         len_f1_performance.loc[idx] = [data_len] + fs
+        len_vio_performance.loc[idx] = [data_len] + vios
 
         idx += 1
 
     # 数据集错误比例的对比实验
     ratio_error_performance = pd.DataFrame(
-        columns=['data_len'] + [func_name for func_name in methods]
+        columns=['error_ratio'] + [func_name for func_name in methods]
     )
     ratio_time_performance = pd.DataFrame(
-        columns=['data_len'] + [func_name for func_name in methods]
+        columns=['error_ratio'] + [func_name for func_name in methods]
     )
     ratio_raa_performance = pd.DataFrame(
-        columns=['data_len'] + [func_name for func_name in methods]
+        columns=['error_ratio'] + [func_name for func_name in methods]
     )
     ratio_precision_performance = pd.DataFrame(
-        columns=['data_len'] + [func_name for func_name in methods]
+        columns=['error_ratio'] + [func_name for func_name in methods]
     )
     ratio_recall_performance = pd.DataFrame(
-        columns=['data_len'] + [func_name for func_name in methods]
+        columns=['error_ratio'] + [func_name for func_name in methods]
     )
     ratio_f1_performance = pd.DataFrame(
-        columns=['data_len'] + [func_name for func_name in methods]
+        columns=['error_ratio'] + [func_name for func_name in methods]
+    )
+    ratio_vio_performance = pd.DataFrame(
+        columns=['error_ratio'] + [func_name for func_name in methods]
     )
 
     idx = 0
 
     for error_ratio in ratios:
-        mts = MTS(dataset, index_col, datetime_index, 5000, verbose=1)
+        mts = MTS(dataset, index_col, datetime_index, 2000, verbose=1)
         mts.constraints_mining(pre_mined=True, mining_constraints=constraints, w=w, verbose=1)
         mts.insert_error(ratio=error_ratio, snr=15, verbose=1)
 
@@ -140,6 +151,7 @@ def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=T
         ps = []
         rs = []
         fs = []
+        vios = []
 
         # 对测试列表中的所有方法都执行测试
         for method in methods:
@@ -153,6 +165,7 @@ def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=T
             error = delta(modified, mts.clean) / mts.delta_clean_origin()
             raa_score = raa(mts.origin, mts.clean, modified)
             p, r, f = f1(is_modified, mts.isDirty)
+            vio_rate = check_repair_violation(modified, mts.stcds, w)
 
             errors.append(error)
             raas.append(raa_score)
@@ -160,11 +173,13 @@ def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=T
             ps.append(p)
             rs.append(r)
             fs.append(f)
+            vios.append(vio_rate)
 
             print('{:=^80}'.format(' {}修复数据集{} '.format(method, mts.dataset.upper())))
             print('修复用时: {:.4g}ms'.format(time))
             print('修复误差比: {:.4g}'.format(error))
             print('修复相对精度: {:.4g}'.format(raa_score))
+            print('修复后约束违反率: {:.4g}'.format(check_repair_violation(modified, mts.stcds, w)))
 
         # 记录实验结果
         ratio_error_performance.loc[idx] = [error_ratio] + errors
@@ -173,6 +188,7 @@ def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=T
         ratio_precision_performance.loc[idx] = [error_ratio] + ps
         ratio_recall_performance.loc[idx] = [error_ratio] + rs
         ratio_f1_performance.loc[idx] = [error_ratio] + fs
+        ratio_vio_performance.loc[idx] = [error_ratio] + vios
 
         idx += 1
 
@@ -183,6 +199,7 @@ def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=T
     len_precision_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_len_precision.csv'.format(dataset.upper(), dataset.upper()), index=False)
     len_recall_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_len_recall.csv'.format(dataset.upper(), dataset.upper()), index=False)
     len_f1_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_len_f1.csv'.format(dataset.upper(), dataset.upper()), index=False)
+    len_vio_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_len_vio.csv'.format(dataset.upper(), dataset.upper()), index=False)
 
     ratio_error_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_ratio_error.csv'.format(dataset.upper(), dataset.upper()), index=False)
     ratio_time_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_ratio_time.csv'.format(dataset.upper(), dataset.upper()), index=False)
@@ -190,6 +207,20 @@ def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=T
     ratio_precision_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_ratio_precision.csv'.format(dataset.upper(), dataset.upper()), index=False)
     ratio_recall_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_ratio_recall.csv'.format(dataset.upper(), dataset.upper()), index=False)
     ratio_f1_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_ratio_f1.csv'.format(dataset.upper(), dataset.upper()), index=False)
+    ratio_vio_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_ratio_vio.csv'.format(dataset.upper(), dataset.upper()), index=False)
+
+
+def different_rules_benchmark_performace(dataset=None, index_col=None, datetime_index=None, methods=None, rule_ratio=[0.2, 0.4, 0.6, 0.8, 1.0]):
+    if dataset is None:
+        dataset = ['idf']
+    if index_col is None:
+        index_col = ['timestamp']
+    if datetime_index is None:
+        datetime_index = [True]
+    if methods is None:
+        methods = ['Func_LP, Func_MVC']
+
+    # TODO 实现
 
 
 def fd_and_rfd(dataset='idf', index_col='timestamp', datetime_index=True,
