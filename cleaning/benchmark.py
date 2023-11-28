@@ -553,6 +553,7 @@ def func_mvc(mts, w=2, size=20, mvc='sorted', overlapping_ratio=0.3):
     is_modified = mts.isModified.copy(deep=True)  # 拷贝修复单元格信息
     time_cost = 0.  # 时间成本
     success_cnt = 0
+    lp_size = 0.
 
     m = mts.dim  # 属性个数
 
@@ -606,6 +607,8 @@ def func_mvc(mts, w=2, size=20, mvc='sorted', overlapping_ratio=0.3):
             # 调用FindKeyCell找到切片中的关键单元格
             repair_edge, key_cell_pos = find_key_cell(violation, mvc=mvc)
 
+            lp_size += len(repair_edge)
+
             # 围绕关键单元格生成约束
             for rule in repair_edge:
                 # 解析约束的参数
@@ -644,6 +647,8 @@ def func_mvc(mts, w=2, size=20, mvc='sorted', overlapping_ratio=0.3):
     # 根据差值判断数据是否被修复
     update_is_modified(mts, modified, is_modified)
 
+    print('构建问题所用约束数量: {:.4g}'.format(lp_size / len(mts.stcds) / mts.len))
+
     return modified, is_modified, time_cost
 
 
@@ -662,33 +667,177 @@ def violation_detect(hypergraph):
 
 
 def find_key_cell(violation, mvc='sorted'):
-    key_cell_pos = []  # 最终返回待清洗的关键变量
+    key_cell_pos = set()   # 最终返回待清洗的关键变量
+    repair_edge = []    # 最终返回清洗所用约束
 
-    pre_violation = None
-
-    if mvc == 'base':
-        pre_violation = violation.copy()
-        random.shuffle(pre_violation)
     if mvc == 'sorted':
         pre_violation = sorted(violation, key=lambda x: x[1], reverse=True)
 
-    repair_edge = []
+        repair_edge = []
 
-    for rule, degree in pre_violation:
-        # 跳过已经被删除的边
-        skip = False
-        for pos in key_cell_pos:
-            if not rule.alpha[pos] == 0:
-                skip = True
-                break
-        if skip:
-            continue
+        for rule, degree in pre_violation:
+            # 跳过已经被删除的边
+            skip = False
+            for pos in key_cell_pos:
+                if not rule.alpha[pos] == 0:
+                    skip = True
+                    break
+            if skip:
+                continue
 
-        # 将新的边删除
-        repair_edge.append(rule)
-        for i, x in enumerate(rule.alpha):
-            if not x == 0:
-                key_cell_pos.append(i)
+            # 将新的边删除
+            repair_edge.append(rule)
+            for i, x in enumerate(rule.alpha):
+                if not x == 0:
+                    key_cell_pos.add(i)
+
+    if mvc == 'shuffle':
+        random.shuffle(violation)
+
+        repair_edge = []
+
+        for rule, degree in violation:
+            # 跳过已经被删除的边
+            skip = False
+            for pos in key_cell_pos:
+                if not rule.alpha[pos] == 0:
+                    skip = True
+                    break
+            if skip:
+                continue
+
+            # 将新的边删除
+            repair_edge.append(rule)
+            for i, x in enumerate(rule.alpha):
+                if not x == 0:
+                    key_cell_pos.add(i)
+
+    if mvc == 'max_degree':
+        n = len(violation[0][0].alpha)     # 所有pos的总长度
+
+        while len(violation) > 0:       # 一直删除直至所有的边都被覆盖
+            # 寻找当前图中度数最大的顶点
+            max_pos = -1
+            max_degree = 0
+            for i in range(n):          # 计算每个pos的度数
+                if i in key_cell_pos:   # 跳过已经被加入Cover中的pos
+                    continue
+                cur_degree = 0
+                for j, vio in enumerate(violation):     # 判断每条未删除的边是否与当前pos连接
+                    if not vio[0].alpha[i] == 0:      # 当前边还未删除且与该pos连接
+                        cur_degree += 1     # 当前pos的度数+1
+                if cur_degree > max_degree:     # 不断更新度数最大的pos
+                    max_degree = cur_degree
+                    max_pos = i
+
+            # 删除度数最大的pos与其连接的边
+            key_cell_pos.add(max_pos)
+
+            max_violation_degree = 0.
+            max_rule = None
+
+            t = violation[:]
+            for vio in violation:
+                if not vio[0].alpha[max_pos] == 0:
+                    if vio[1] > max_violation_degree:
+                        max_violation_degree = vio[1]
+                        max_rule = vio[0]
+                    t.remove(vio)
+            violation = t
+
+            if max_rule is not None:
+                repair_edge.append(max_rule)
+
+    if mvc == 'vertex_support':
+        n = len(violation[0][0].alpha)  # 所有pos的总长度
+
+        while len(violation) > 0:  # 一直删除直至所有的边都被覆盖
+            # 寻找当前图中支持度最大的顶点
+            max_pos = -1
+            max_support = 0
+            for i in range(n):  # 计算每个pos的支持度
+                if i in key_cell_pos:   # 跳过已经被加入Cover中的pos
+                    continue
+                i_support = 0
+                for j in range(n):      # 遍历所有其他未删除顶点
+                    j_degree = 0
+                    if j in key_cell_pos or j == i:  # 跳过已经被加入Cover中的pos
+                        continue
+                    is_neighbor = False
+                    for vio in violation:       # 判断每条边是否连接顶点ij同时记录顶点j的度数
+                        if not vio[0].alpha[j] == 0:    # 累积顶点j的度数
+                            j_degree += 1     # 当前pos的度数+1
+                            if not vio[0].alpha[i] == 0:    # 顶点i和j是邻居
+                                is_neighbor = True
+                    if is_neighbor:     # 每个顶点的支持度是其所有邻居的度数的总和
+                        i_support += j_degree
+                if i_support > max_support:     # 不断更新支持度最大的pos
+                    max_support = i_support
+                    max_pos = i
+
+            # 删除度数最大的pos与其连接的边
+            key_cell_pos.add(max_pos)
+
+            max_violation_degree = 0.
+            max_rule = None
+
+            t = violation[:]
+            for vio in violation:
+                if not vio[0].alpha[max_pos] == 0:
+                    if vio[1] > max_violation_degree:
+                        max_violation_degree = vio[1]
+                        max_rule = vio[0]
+                    t.remove(vio)
+            violation = t
+
+            if max_rule is not None:
+                repair_edge.append(max_rule)
+
+    if mvc == 'greedy':
+        n = len(violation[0][0].alpha)  # 所有pos的总长度
+
+        deleted_pos = set()
+
+        while len(violation) > 0:  # 一直删除直至所有的边都被覆盖
+            # 寻找当前图中度数最小的顶点
+            min_pos = -1
+            min_degree = n
+            for i in range(n):  # 计算每个pos的度数
+                if i in key_cell_pos or i in deleted_pos:  # 跳过已经被加入Cover中的pos
+                    continue
+                cur_degree = 0
+                for j, vio in enumerate(violation):  # 判断每条未删除的边是否与当前pos连接
+                    if not vio[0].alpha[i] == 0:  # 当前边还未删除且与该pos连接
+                        cur_degree += 1  # 当前pos的度数+1
+                if cur_degree < min_degree:  # 不断更新度数最大的pos
+                    min_degree = cur_degree
+                    min_pos = i
+
+            # 删除度数最小的pos与其连接的边
+            key_cell_pos.add(min_pos)
+
+            max_violation_degree = 0.
+            max_rule = None
+
+            t = violation[:]
+            for vio in violation:
+                if not vio[0].alpha[min_pos] == 0:
+                    if vio[1] > max_violation_degree:
+                        max_violation_degree = vio[1]
+                        max_rule = vio[0]
+                    # 还要删除度数最小的pos的邻居以及邻居连接的边
+                    for j in range(n):
+                        if j in key_cell_pos or j in deleted_pos or j == min_pos:
+                            continue
+                        if not vio[0].alpha[j] == 0:    # 顶点j是顶点i的邻居
+                            deleted_pos.add(j)
+                            for vio_j in violation:
+                                if not vio_j[0].alpha[j] == 0 and vio_j in t:
+                                    t.remove(vio_j)
+            violation = t
+
+            if max_rule is not None:
+                repair_edge.append(max_rule)
 
     return repair_edge, key_cell_pos
 

@@ -50,6 +50,7 @@ class Linear:
         for mask_str in x_possible:
             mask = str2mask(mask_str)
             for i in range(len(mask)):
+                # if mask[i] == 1 and x_vars[i][2] == y_var[2]:     # 忽略列名近似性
                 if mask[i] == 1 and (str_similar(x_vars[i][1], y_var[1]) < 0.8 or (x_vars[i][2] == y_var[2])):
                     remove_mask.append(mask_str)
         for mask in remove_mask:

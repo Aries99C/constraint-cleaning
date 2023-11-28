@@ -31,7 +31,7 @@ func_dict = {
 
 def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=True, w=2,
                           lens=range(2000, 20000 + 1, 2000), ratios=np.arange(0.05, 0.35 + 0.01, 0.05),
-                          constraints=None, methods=None):
+                          constraints=None, methods=None, pre_mined=True, n_component=1, mvc='sorted', save=False, verbose=0):
     if methods is None:
         methods = ['Func_MVC', 'Func_LP', 'EWMA', 'Speed(G)', 'Speed+Acc(G)', 'Median', 'IMR', 'Speed(L)',
                    'Speed+Acc(L)']
@@ -65,8 +65,8 @@ def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=T
 
     for data_len in lens:
         mts = MTS(dataset, index_col, datetime_index, data_len, verbose=1)
-        mts.constraints_mining(pre_mined=True, mining_constraints=constraints, w=w, verbose=1)
-        mts.insert_error(ratio=0.1, snr=15, verbose=1)
+        mts.constraints_mining(pre_mined=pre_mined, mining_constraints=constraints, w=w, n_component=n_component, verbose=verbose)
+        mts.insert_error(ratio=0.1, snr=15, verbose=verbose)
 
         errors = []
         raas = []
@@ -78,10 +78,12 @@ def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=T
 
         # 对测试列表中的所有方法都执行测试
         for method in methods:
-            if method in ['Speed(L)', 'Speed+Acc(L)', 'Median', 'Func_LP', 'Func_MVC']:
+            if method in ['Speed(L)', 'Speed+Acc(L)', 'Median', 'Func_LP']:
                 modified, is_modified, time = func_dict[method](mts, w=w)
             elif method in ['Speed(G)', 'Speed+Acc(G)']:
                 modified, is_modified, time = func_dict[method](mts, w=w, x=5)
+            elif method in ['Func_MVC']:
+                modified, is_modified, time = func_dict[method](mts, w=w, mvc=mvc)
             else:
                 modified, is_modified, time = func_dict[method](mts)
 
@@ -102,6 +104,7 @@ def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=T
             print('修复用时: {:.4g}ms'.format(time))
             print('修复误差比: {:.4g}'.format(error))
             print('修复相对精度: {:.4g}'.format(raa_score))
+            print('错误检测F1分数: {:.4g}'.format(f))
             print('修复后约束违反率: {:.4g}'.format(check_repair_violation(modified, mts.stcds, w)))
 
         # 记录实验结果
@@ -142,8 +145,8 @@ def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=T
 
     for error_ratio in ratios:
         mts = MTS(dataset, index_col, datetime_index, 4000, verbose=1)
-        mts.constraints_mining(pre_mined=True, mining_constraints=constraints, w=w, verbose=1)
-        mts.insert_error(ratio=error_ratio, snr=15, verbose=1)
+        mts.constraints_mining(pre_mined=pre_mined, mining_constraints=constraints, w=w, n_component=n_component, verbose=verbose)
+        mts.insert_error(ratio=error_ratio, snr=15, verbose=verbose)
 
         errors = []
         raas = []
@@ -155,10 +158,12 @@ def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=T
 
         # 对测试列表中的所有方法都执行测试
         for method in methods:
-            if method in ['Speed(L)', 'speed+Acc(L)', 'Median', 'Func_LP', 'Func_MVC']:
+            if method in ['Speed(L)', 'Speed+Acc(L)', 'Median', 'Func_LP']:
                 modified, is_modified, time = func_dict[method](mts, w=w)
-            elif method in ['Speed(G)', 'speed+Acc(G)']:
+            elif method in ['Speed(G)', 'Speed+Acc(G)']:
                 modified, is_modified, time = func_dict[method](mts, w=w, x=5)
+            elif method in ['Func_MVC']:
+                modified, is_modified, time = func_dict[method](mts, w=w, mvc=mvc)
             else:
                 modified, is_modified, time = func_dict[method](mts)
 
@@ -179,6 +184,7 @@ def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=T
             print('修复用时: {:.4g}ms'.format(time))
             print('修复误差比: {:.4g}'.format(error))
             print('修复相对精度: {:.4g}'.format(raa_score))
+            print('错误检测F1分数: {:.4g}'.format(f))
             print('修复后约束违反程度: {:.4g}'.format(check_repair_violation(modified, mts.stcds, w)))
 
         # 记录实验结果
@@ -193,34 +199,22 @@ def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=T
         idx += 1
 
     # 保存数据
-    len_error_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_len_error.csv'.format(dataset.upper(), dataset.upper()), index=False)
-    len_time_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_len_time.csv'.format(dataset.upper(), dataset.upper()), index=False)
-    len_raa_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_len_raa.csv'.format(dataset.upper(), dataset.upper()), index=False)
-    len_precision_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_len_precision.csv'.format(dataset.upper(), dataset.upper()), index=False)
-    len_recall_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_len_recall.csv'.format(dataset.upper(), dataset.upper()), index=False)
-    len_f1_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_len_f1.csv'.format(dataset.upper(), dataset.upper()), index=False)
-    len_vio_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_len_vio.csv'.format(dataset.upper(), dataset.upper()), index=False)
+    if save:
+        len_error_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_len_error.csv'.format(dataset.upper(), dataset.upper()), index=False)
+        len_time_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_len_time.csv'.format(dataset.upper(), dataset.upper()), index=False)
+        len_raa_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_len_raa.csv'.format(dataset.upper(), dataset.upper()), index=False)
+        len_precision_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_len_precision.csv'.format(dataset.upper(), dataset.upper()), index=False)
+        len_recall_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_len_recall.csv'.format(dataset.upper(), dataset.upper()), index=False)
+        len_f1_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_len_f1.csv'.format(dataset.upper(), dataset.upper()), index=False)
+        len_vio_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_len_vio.csv'.format(dataset.upper(), dataset.upper()), index=False)
 
-    ratio_error_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_ratio_error.csv'.format(dataset.upper(), dataset.upper()), index=False)
-    ratio_time_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_ratio_time.csv'.format(dataset.upper(), dataset.upper()), index=False)
-    ratio_raa_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_ratio_raa.csv'.format(dataset.upper(), dataset.upper()), index=False)
-    ratio_precision_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_ratio_precision.csv'.format(dataset.upper(), dataset.upper()), index=False)
-    ratio_recall_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_ratio_recall.csv'.format(dataset.upper(), dataset.upper()), index=False)
-    ratio_f1_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_ratio_f1.csv'.format(dataset.upper(), dataset.upper()), index=False)
-    ratio_vio_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_ratio_vio.csv'.format(dataset.upper(), dataset.upper()), index=False)
-
-
-def different_rules_benchmark_performace(dataset=None, index_col=None, datetime_index=None, methods=None, rule_ratio=[0.2, 0.4, 0.6, 0.8, 1.0]):
-    if dataset is None:
-        dataset = ['idf']
-    if index_col is None:
-        index_col = ['timestamp']
-    if datetime_index is None:
-        datetime_index = [True]
-    if methods is None:
-        methods = ['Func_LP, Func_MVC']
-
-    # TODO 实现
+        ratio_error_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_ratio_error.csv'.format(dataset.upper(), dataset.upper()), index=False)
+        ratio_time_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_ratio_time.csv'.format(dataset.upper(), dataset.upper()), index=False)
+        ratio_raa_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_ratio_raa.csv'.format(dataset.upper(), dataset.upper()), index=False)
+        ratio_precision_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_ratio_precision.csv'.format(dataset.upper(), dataset.upper()), index=False)
+        ratio_recall_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_ratio_recall.csv'.format(dataset.upper(), dataset.upper()), index=False)
+        ratio_f1_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_ratio_f1.csv'.format(dataset.upper(), dataset.upper()), index=False)
+        ratio_vio_performance.to_csv(PROJECT_ROOT + '/exp/{}/{}_ratio_vio.csv'.format(dataset.upper(), dataset.upper()), index=False)
 
 
 def fd_and_rfd(dataset='idf', index_col='timestamp', datetime_index=True,
@@ -287,13 +281,71 @@ def fd_and_rfd(dataset='idf', index_col='timestamp', datetime_index=True,
 
 
 if __name__ == '__main__':
-    benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=True,
-                          lens=range(5000, 20000 + 1, 5000),
-                          ratios=np.arange(0.1, 0.3 + 0.01, 0.1))
-    benchmark_performance(dataset='SWaT', index_col='Timestamp', datetime_index=False,
-                          lens=range(7000, 28000 + 1, 7000),
-                          ratios=np.arange(0.1, 0.3 + 0.01, 0.1))
-    benchmark_performance(dataset='WADI', index_col='Row', datetime_index=False,
-                          lens=range(5000, 20000 + 1, 5000),
-                          ratios=np.arange(0.1, 0.3 + 0.01, 0.1))
+    # 对比实验
+    # benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=True,
+    #                       lens=range(5000, 20000 + 1, 5000),
+    #                       ratios=np.arange(0.1, 0.3 + 0.01, 0.1))
+    # benchmark_performance(dataset='SWaT', index_col='Timestamp', datetime_index=False,
+    #                       lens=range(7000, 28000 + 1, 7000),
+    #                       ratios=np.arange(0.1, 0.3 + 0.01, 0.1))
+    # benchmark_performance(dataset='WADI', index_col='Row', datetime_index=False,
+    #                       lens=range(5000, 20000 + 1, 5000),
+    #                       ratios=np.arange(0.1, 0.3 + 0.01, 0.1))
+    # benchmark_performance(dataset='SMD', index_col='Timestamp', datetime_index=False,
+    #                       lens=range(7000, 28000 + 1, 7000),
+    #                       ratios=np.arange(0.1, 0.3 + 0.01, 0.1))
+    # benchmark_performance(dataset='ASD', index_col='Timestamp', datetime_index=False,
+    #                       lens=range(2000, 8000 + 1, 2000),
+    #                       ratios=np.arange(0.1, 0.3 + 0.01, 0.1))
+
+    # 消融实验-规则数影响
+    # for n in range(1, 4):
+    #     benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=True, pre_mined=False, n_component=n,
+    #                           methods=['Func_MVC', 'Func_LP'],
+    #                           lens=range(10000, 10000 + 1, 5000),
+    #                           ratios=[])
+    #     benchmark_performance(dataset='SWaT', index_col='Timestamp', datetime_index=False, pre_mined=False, n_component=n,
+    #                           methods=['Func_MVC', 'Func_LP'],
+    #                           lens=range(14000, 14000 + 1, 7000),
+    #                           ratios=[])
+    #     benchmark_performance(dataset='WADI', index_col='Row', datetime_index=False, pre_mined=False, n_component=n,
+    #                           methods=['Func_MVC', 'Func_LP'],
+    #                           lens=range(10000, 10000 + 1, 5000),
+    #                           ratios=[])
+    #     benchmark_performance(dataset='SMD', index_col='Timestamp', datetime_index=False, pre_mined=False, n_component=n,
+    #                           methods=['Func_MVC', 'Func_LP'],
+    #                           lens=range(14000, 14000 + 1, 7000),
+    #                           ratios=[])
+    #     benchmark_performance(dataset='ASD', index_col='Timestamp', datetime_index=False, pre_mined=False, n_component=n,
+    #                           methods=['Func_MVC', 'Func_LP'],
+    #                           lens=range(4000, 4000 + 1, 5000),
+    #                           ratios=[])
+
+    # 消融实验-MVC策略影响
+    # benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=True, pre_mined=True,
+    #                       methods=['Func_MVC'], mvc='sorted',
+    #                       lens=range(10000, 10000 + 1, 5000),
+    #                       ratios=[])
+    benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=True, pre_mined=True,
+                          methods=['Func_MVC'], mvc='greedy',
+                          lens=range(10000, 10000 + 1, 5000),
+                          ratios=[])
+    # benchmark_performance(dataset='SWaT', index_col='Timestamp', datetime_index=False, pre_mined=True,
+    #                       methods=['Func_MVC'], mvc='sorted',
+    #                       lens=range(14000, 14000 + 1, 7000),
+    #                       ratios=[])
+    # benchmark_performance(dataset='WADI', index_col='Row', datetime_index=False, pre_mined=True,
+    #                       methods=['Func_MVC'], mvc='sorted',
+    #                       lens=range(10000, 10000 + 1, 5000),
+    #                       ratios=[])
+    # benchmark_performance(dataset='SMD', index_col='Timestamp', datetime_index=False, pre_mined=True,
+    #                       methods=['Func_MVC'], mvc='sorted',
+    #                       lens=range(14000, 14000 + 1, 7000),
+    #                       ratios=[])
+    # benchmark_performance(dataset='ASD', index_col='Timestamp', datetime_index=False, pre_mined=True,
+    #                       methods=['Func_MVC'], mvc='sorted',
+    #                       lens=range(4000, 4000 + 1, 5000),
+    #                       ratios=[])
+
+    # RFD性能对比实验
     # fd_and_rfd(lens=range(100, 500 + 1, 100))
