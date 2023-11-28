@@ -37,12 +37,26 @@ def check_repair_violation(modified, rules, w):
     for t in slices:
         for rule in rules:
             score = rule.violation_degree(t)
-            violation_rate += score
+            violation_rate += score / (rule.ub + 1e-4)
 
     violation_rate /= (len(modified) * len(modified.columns))
 
     return violation_rate
 
+
+def violation_rate(modified, rules, w):
+    slices = array2window(df2array(modified), w)
+
+    violation_rate = 0.
+
+    for t in slices:
+        for rule in rules:
+            if rule.violation_degree(t) > 1e-5:
+                violation_rate += 1
+
+    violation_rate /= ((len(modified) - w) * len(rules))
+
+    return violation_rate
 
 def df2array(df):
     d = df.copy(deep=True)  # 拷贝值

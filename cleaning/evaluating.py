@@ -141,7 +141,7 @@ def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=T
     idx = 0
 
     for error_ratio in ratios:
-        mts = MTS(dataset, index_col, datetime_index, 2000, verbose=1)
+        mts = MTS(dataset, index_col, datetime_index, 4000, verbose=1)
         mts.constraints_mining(pre_mined=True, mining_constraints=constraints, w=w, verbose=1)
         mts.insert_error(ratio=error_ratio, snr=15, verbose=1)
 
@@ -179,7 +179,7 @@ def benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=T
             print('修复用时: {:.4g}ms'.format(time))
             print('修复误差比: {:.4g}'.format(error))
             print('修复相对精度: {:.4g}'.format(raa_score))
-            print('修复后约束违反率: {:.4g}'.format(check_repair_violation(modified, mts.stcds, w)))
+            print('修复后约束违反程度: {:.4g}'.format(check_repair_violation(modified, mts.stcds, w)))
 
         # 记录实验结果
         ratio_error_performance.loc[idx] = [error_ratio] + errors
@@ -287,5 +287,13 @@ def fd_and_rfd(dataset='idf', index_col='timestamp', datetime_index=True,
 
 
 if __name__ == '__main__':
-    benchmark_performance(dataset='WADI', index_col='Row', datetime_index=False, lens=range(2000, 20000 + 1, 2000), ratios=np.arange(0.05, 0.35 + 0.01, 0.05))
+    benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=True,
+                          lens=range(5000, 20000 + 1, 5000),
+                          ratios=np.arange(0.1, 0.3 + 0.01, 0.1))
+    benchmark_performance(dataset='SWaT', index_col='Timestamp', datetime_index=False,
+                          lens=range(7000, 28000 + 1, 7000),
+                          ratios=np.arange(0.1, 0.3 + 0.01, 0.1))
+    benchmark_performance(dataset='WADI', index_col='Row', datetime_index=False,
+                          lens=range(5000, 20000 + 1, 5000),
+                          ratios=np.arange(0.1, 0.3 + 0.01, 0.1))
     # fd_and_rfd(lens=range(100, 500 + 1, 100))
