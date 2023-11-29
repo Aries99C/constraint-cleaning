@@ -750,94 +750,106 @@ def find_key_cell(violation, mvc='sorted'):
 
     if mvc == 'vertex_support':
         n = len(violation[0][0].alpha)  # 所有pos的总长度
+        m = len(violation)
 
-        while len(violation) > 0:  # 一直删除直至所有的边都被覆盖
-            # 寻找当前图中支持度最大的顶点
-            max_pos = -1
-            max_support = 0
-            for i in range(n):  # 计算每个pos的支持度
-                if i in key_cell_pos:   # 跳过已经被加入Cover中的pos
-                    continue
-                i_support = 0
-                for j in range(n):      # 遍历所有其他未删除顶点
-                    j_degree = 0
-                    if j in key_cell_pos or j == i:  # 跳过已经被加入Cover中的pos
-                        continue
-                    is_neighbor = False
-                    for vio in violation:       # 判断每条边是否连接顶点ij同时记录顶点j的度数
-                        if not vio[0].alpha[j] == 0:    # 累积顶点j的度数
-                            j_degree += 1     # 当前pos的度数+1
-                            if not vio[0].alpha[i] == 0:    # 顶点i和j是邻居
-                                is_neighbor = True
-                    if is_neighbor:     # 每个顶点的支持度是其所有邻居的度数的总和
-                        i_support += j_degree
-                if i_support > max_support:     # 不断更新支持度最大的pos
-                    max_support = i_support
-                    max_pos = i
+        rest_edge = set(range(m))   # 剩余的边索引集合
+        rest_pos = set(range(n))
 
-            # 删除度数最大的pos与其连接的边
-            key_cell_pos.add(max_pos)
+        while len(rest_edge) > 0:  # 一直删除直至所有的边都被覆盖
+            # 先计算所有顶点的度数
+            degrees = np.zeros(n)
+            for i, vio in enumerate(violation):
+                if i in rest_edge:  # 从剩余的边中计算度数
+                    degrees = degrees + np.array([1 if not x == 0 else 0 for x in vio[0].alpha])
 
+            # 再计算所有顶点的支持度
+            supports = np.zeros(n)
+            for k, vio in enumerate(violation):
+                if k in rest_edge:  # 从剩余的边中判断邻居
+                    alpha = vio[0].alpha
+                    for i in range(n):
+                        for j in range(n):
+                            if (not i == j) and (not alpha[i] == 0) and (not alpha[j] == 0):    # 顶点i和j是邻居
+                                supports[i] += degrees[j]
+                                supports[j] += degrees[i]
+
+            # 寻找最大的支持度对应的顶点u
+            max_support_pos = np.argmax(supports)
+
+            # 从图中删除顶点u以及与其相连的边
+            # 先删除边，同时找到违反程度最高的作为修复用边
             max_violation_degree = 0.
-            max_rule = None
+            max_violation_edge = None
 
-            t = violation[:]
-            for vio in violation:
-                if not vio[0].alpha[max_pos] == 0:
-                    if vio[1] > max_violation_degree:
-                        max_violation_degree = vio[1]
-                        max_rule = vio[0]
-                    t.remove(vio)
-            violation = t
+            to_delete = set()
+            for i, vio in enumerate(violation):
+                if i in rest_edge:
+                    if not vio[0].alpha[max_support_pos] == 0:      # 当前边与顶点u连接
+                        to_delete.add(i)    # 添加待删除的边的索引
+                        if vio[1] > max_violation_degree:
+                            max_violation_degree = vio[1]
+                            max_violation_edge = vio[0]
+            # 更新剩余边的索引集合
+            rest_edge = rest_edge - to_delete
+            rest_pos = rest_pos - {max_support_pos}
+            # 再删除顶点u
+            key_cell_pos.add(max_support_pos)
 
-            if max_rule is not None:
-                repair_edge.append(max_rule)
+            if max_violation_edge is not None:
+                repair_edge.append(max_violation_edge)
 
     if mvc == 'greedy':
         n = len(violation[0][0].alpha)  # 所有pos的总长度
+        m = len(violation)
 
-        deleted_pos = set()
+        rest_edge = set(range(m))  # 剩余的边索引集合
+        rest_pos = set(range(n))
 
-        while len(violation) > 0:  # 一直删除直至所有的边都被覆盖
-            # 寻找当前图中度数最小的顶点
-            min_pos = -1
-            min_degree = n
-            for i in range(n):  # 计算每个pos的度数
-                if i in key_cell_pos or i in deleted_pos:  # 跳过已经被加入Cover中的pos
-                    continue
-                cur_degree = 0
-                for j, vio in enumerate(violation):  # 判断每条未删除的边是否与当前pos连接
-                    if not vio[0].alpha[i] == 0:  # 当前边还未删除且与该pos连接
-                        cur_degree += 1  # 当前pos的度数+1
-                if cur_degree < min_degree:  # 不断更新度数最大的pos
-                    min_degree = cur_degree
-                    min_pos = i
+        while len(rest_edge) > 0:  # 一直删除直至所有的边都被覆盖
+            # 先计算所有顶点的度数
+            degrees = np.zeros(n)
+            for i, vio in enumerate(violation):
+                if i in rest_edge:  # 从剩余的边中计算度数
+                    degrees = degrees + np.array([1 if not x == 0 else 0 for x in vio[0].alpha])
+            # 寻找最小的度数对应的顶点u
+            min_degree_pos = np.argmin([degrees[i] if i in rest_pos else n for i, degree in enumerate(degrees)])
 
-            # 删除度数最小的pos与其连接的边
-            key_cell_pos.add(min_pos)
-
+            # 从图中删除顶点u以及与其相连的边以及其邻居
+            # 先找邻居，然后删除和邻居连接的边
             max_violation_degree = 0.
-            max_rule = None
+            max_violation_edge = None
 
-            t = violation[:]
-            for vio in violation:
-                if not vio[0].alpha[min_pos] == 0:
-                    if vio[1] > max_violation_degree:
-                        max_violation_degree = vio[1]
-                        max_rule = vio[0]
-                    # 还要删除度数最小的pos的邻居以及邻居连接的边
-                    for j in range(n):
-                        if j in key_cell_pos or j in deleted_pos or j == min_pos:
-                            continue
-                        if not vio[0].alpha[j] == 0:    # 顶点j是顶点i的邻居
-                            deleted_pos.add(j)
-                            for vio_j in violation:
-                                if not vio_j[0].alpha[j] == 0 and vio_j in t:
-                                    t.remove(vio_j)
-            violation = t
+            delete_pos = set()
+            delete_edge = set()
+            for i, vio in enumerate(violation):
+                if i in rest_edge:
+                    if not vio[0].alpha[min_degree_pos] == 0:  # 当前边与顶点u连接
+                        delete_edge.add(i)
+                        if vio[1] > max_violation_degree:
+                            max_violation_degree = vio[1]
+                            max_violation_edge = vio[0]
+                        for j in range(n):
+                            if (j in rest_edge) and (not vio[0].alpha[j] == 0) and (not j == min_degree_pos):
+                                delete_pos.add(j)
+            # 更新剩余的边和顶点
+            rest_edge = rest_edge - delete_edge
+            rest_pos = rest_pos - delete_pos
+            # 再删除与邻居相连的剩余的边
+            for i, vio in enumerate(violation):
+                if i in rest_edge:
+                    for j in delete_pos:
+                        if not vio[0].alpha[j] == 0:  # 当前边与邻居连接
+                            delete_edge.add(i)
+                            break
+            # 再次更新
+            rest_edge = rest_edge - delete_edge
+            rest_pos = rest_pos - {min_degree_pos}
 
-            if max_rule is not None:
-                repair_edge.append(max_rule)
+            # 最后删除顶点
+            key_cell_pos.add(min_degree_pos)
+
+            if max_violation_edge is not None:
+                repair_edge.append(max_violation_edge)
 
     return repair_edge, key_cell_pos
 

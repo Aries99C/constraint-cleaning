@@ -330,6 +330,10 @@ if __name__ == '__main__':
                           methods=['Func_MVC'], mvc='greedy',
                           lens=range(10000, 10000 + 1, 5000),
                           ratios=[])
+    benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=True, pre_mined=True,
+                          methods=['Func_MVC'], mvc='vertex_support',
+                          lens=range(10000, 10000 + 1, 5000),
+                          ratios=[])
     # benchmark_performance(dataset='SWaT', index_col='Timestamp', datetime_index=False, pre_mined=True,
     #                       methods=['Func_MVC'], mvc='sorted',
     #                       lens=range(14000, 14000 + 1, 7000),
