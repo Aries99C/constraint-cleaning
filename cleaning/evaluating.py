@@ -291,9 +291,10 @@ if __name__ == '__main__':
     # benchmark_performance(dataset='WADI', index_col='Row', datetime_index=False,
     #                       lens=range(5000, 20000 + 1, 5000),
     #                       ratios=np.arange(0.1, 0.3 + 0.01, 0.1))
-    # benchmark_performance(dataset='SMD', index_col='Timestamp', datetime_index=False,
-    #                       lens=range(7000, 28000 + 1, 7000),
-    #                       ratios=np.arange(0.1, 0.3 + 0.01, 0.1))
+    benchmark_performance(dataset='SMD', index_col='Timestamp', datetime_index=False,
+                          lens=range(7000, 28000 + 1, 7000),
+                          ratios=np.arange(0.1, 0.3 + 0.01, 0.1),
+                          save=True)
     # benchmark_performance(dataset='ASD', index_col='Timestamp', datetime_index=False,
     #                       lens=range(2000, 8000 + 1, 2000),
     #                       ratios=np.arange(0.1, 0.3 + 0.01, 0.1))
@@ -326,14 +327,14 @@ if __name__ == '__main__':
     #                       methods=['Func_MVC'], mvc='sorted',
     #                       lens=range(10000, 10000 + 1, 5000),
     #                       ratios=[])
-    benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=True, pre_mined=True,
-                          methods=['Func_MVC'], mvc='greedy',
-                          lens=range(10000, 10000 + 1, 5000),
-                          ratios=[])
-    benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=True, pre_mined=True,
-                          methods=['Func_MVC'], mvc='vertex_support',
-                          lens=range(10000, 10000 + 1, 5000),
-                          ratios=[])
+    # benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=True, pre_mined=True,
+    #                       methods=['Func_MVC'], mvc='vertex_support',
+    #                       lens=range(10000, 10000 + 1, 5000),
+    #                       ratios=[])
+    # benchmark_performance(dataset='idf', index_col='timestamp', datetime_index=True, pre_mined=True,
+    #                       methods=['Func_MVC'], mvc='vertex_support',
+    #                       lens=range(10000, 10000 + 1, 5000),
+    #                       ratios=[])
     # benchmark_performance(dataset='SWaT', index_col='Timestamp', datetime_index=False, pre_mined=True,
     #                       methods=['Func_MVC'], mvc='sorted',
     #                       lens=range(14000, 14000 + 1, 7000),

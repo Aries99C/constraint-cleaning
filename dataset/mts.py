@@ -300,15 +300,15 @@ if __name__ == '__main__':
     # 实验参数
     w = 2
 
-    idf = MTS('idf', 'timestamp', True, size=2000, verbose=1)                      # 读取数据集
+    # idf = MTS('idf', 'timestamp', True, size=2000, verbose=1)                     # 读取数据集
     # idf = MTS('SWaT', 'Timestamp', False, size=2000, verbose=1)
     # idf = MTS('WADI', 'Row', False, size=2000, verbose=1)
-    # idf = MTS('SMD', 'Timestamp', False, size=2000, verbose=1)
+    idf = MTS('SMD', 'Timestamp', False, size=5000, verbose=1)
     # idf = MTS('ASD', 'Timestamp', False, size=2000, verbose=1)
 
-    # idf.constraints_mining(w=w, verbose=1)             # 挖掘约束
-    idf.constraints_mining(pre_mined=True, verbose=1)                               # 预配置约束集合
-    idf.insert_error(snr=15, verbose=1)                                             # 注入噪声
+    idf.constraints_mining(w=w, verbose=1)                                          # 挖掘约束
+    # idf.constraints_mining(pre_mined=True, verbose=1)                               # 预配置约束集合
+    idf.insert_error(snr=30, verbose=1)                                             # 注入噪声
 
     # 速度约束Local修复
     speed_local_modified, speed_local_is_modified, speed_local_time = speed_local(idf, w=w)
@@ -398,10 +398,11 @@ if __name__ == '__main__':
     print('修复后约束违反程度: {:.4g}'.format(check_repair_violation(func_mvc_modified, idf.stcds, w)))
     print('修复后约束违反率: {:.4g}'.format(violation_rate(func_mvc_modified, idf.stcds, w)))
 
-    # idf.clean.plot(subplots=True, figsize=(10, 10))
-    # idf.origin.plot(subplots=True, figsize=(10, 10))
-    # func_lp_modified.plot(subplots=True, figsize=(10, 10))
-    # plt.show()
+    idf.clean.plot(subplots=True, figsize=(10, 10))
+    idf.origin.plot(subplots=True, figsize=(10, 10))
+    func_lp_modified.plot(subplots=True, figsize=(10, 10))
+    func_mvc_modified.plot(subplots=True, figsize=(10, 10))
+    plt.show()
 
     # fd_modified, fd_is_modified, fd_time = fd_detect(idf)
     # fd_p, fd_r, fd_f1 = f1(fd_is_modified, idf.isDirty)
