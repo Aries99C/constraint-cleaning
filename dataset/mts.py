@@ -238,6 +238,11 @@ class MTS(object):
         self.isLabel[:5] = True             # 为IMR算法提供最基础的标签
 
         # 向观测值注入错误
+        # 样例错误 U3_HNC10CT111
+        self.origin['U3_HNC10CT111'].values[30: 45] += 2.
+        self.isDirty['U3_HNC10CT111'].values[30: 45] = True
+        self.isLabel['U3_HNC10CT111'].values[36] = True
+
         # 先根据信噪比生成白噪声
         noise_df = self.clean.copy(deep=True)   # 拷贝DataFrame格式
         for attr in noise_df.columns:
@@ -254,7 +259,7 @@ class MTS(object):
         while error_size > 0:
             insert_attrs = random.sample(self.cols, max(int(ratio * self.dim), 2))      # 随机注入部分属性
             insert_len = random.randint(10, 50)                             # 随机的错误长度
-            insert_pos = random.randint(20, self.len - insert_len - 1)      # 随机的注入位置
+            insert_pos = random.randint(50, self.len - insert_len - 1)      # 随机的注入位置
             for attr in insert_attrs:
                 if self.isDirty[attr].values[insert_pos]:   # 若已经注入过错误就跳过
                     continue
@@ -267,8 +272,6 @@ class MTS(object):
         # 拷贝待修复值，后续将在待修复值上进行修改
         self.modified = self.origin.copy(deep=True)
 
-        # 初始化记录修复的单元格，False代表单元格没有修改
-        self.isModified = self.origin.copy(deep=True)
         for col in self.isModified.columns:
             self.isModified[col] = False    # 全部初始化为False
 
@@ -299,10 +302,10 @@ if __name__ == '__main__':
     # 实验参数
     w = 2
 
-    # idf = MTS('idf', 'timestamp', True, size=2000, verbose=1)                     # 读取数据集
+    idf = MTS('idf', 'timestamp', True, size=2000, verbose=1)                     # 读取数据集
     # idf = MTS('SWaT', 'Timestamp', False, size=2000, verbose=1)
     # idf = MTS('WADI', 'Row', False, size=2000, verbose=1)
-    idf = MTS('PUMP', 'time', False, size=5000, verbose=1)
+    # idf = MTS('PUMP', 'time', False, size=5000, verbose=1)
 
     # idf.constraints_mining(w=w, verbose=1)                                          # 挖掘约束
     idf.constraints_mining(pre_mined=True, verbose=1)                               # 预配置约束集合
@@ -340,7 +343,7 @@ if __name__ == '__main__':
 
     # 修复
     # # 速度约束Local修复
-    # speed_local_modified, speed_local_is_modified, speed_local_time = speed_local(idf, w=w)
+    speed_local_modified, speed_local_is_modified, speed_local_time = speed_local(idf, w=w)
     # print('{:=^80}'.format(' 局部速度约束修复数据集{} '.format(idf.dataset.upper())))
     # print('修复用时: {:.4g}ms'.format(speed_local_time))
     # print('修复值与正确值平均误差: {:.4g}'.format(delta(speed_local_modified, idf.clean)))
@@ -349,7 +352,7 @@ if __name__ == '__main__':
     # print('修复后约束违反率: {:.4g}'.format(violation_rate(speed_local_modified, idf.stcds, w)))
     #
     # # 速度约束Global修复
-    # speed_global_modified, speed_global_is_modified, speed_global_time = speed_global(idf, w=w, x=10)
+    speed_global_modified, speed_global_is_modified, speed_global_time = speed_global(idf, w=w, x=10)
     # print('{:=^80}'.format(' 全局速度约束修复数据集{} '.format(idf.dataset.upper())))
     # print('修复用时: {:.4g}ms'.format(speed_global_time))
     # print('修复值与正确值平均误差: {:.4g}'.format(delta(speed_global_modified, idf.clean)))
@@ -358,7 +361,7 @@ if __name__ == '__main__':
     # print('修复后约束违反率: {:.4g}'.format(violation_rate(speed_global_modified, idf.stcds, w)))
     #
     # # 速度约束+加速度约束Local修复
-    # acc_local_modified, acc_local_is_modified, acc_local_time = acc_local(idf)
+    acc_local_modified, acc_local_is_modified, acc_local_time = acc_local(idf)
     # print('{:=^80}'.format(' 局部速度约束+加速度约束修复数据集{} '.format(idf.dataset.upper())))
     # print('修复用时: {:.4g}ms'.format(acc_local_time))
     # print('修复值与正确值平均误差: {:.4g}'.format(delta(acc_local_modified, idf.clean)))
@@ -366,8 +369,8 @@ if __name__ == '__main__':
     # print('修复后约束违反程度: {:.4g}'.format(check_repair_violation(acc_local_modified, idf.stcds, w)))
     # print('修复后约束违反率: {:.4g}'.format(violation_rate(acc_local_modified, idf.stcds, w)))
     #
-    # # 速度约束+加速度约束Global修复
-    # acc_global_modified, acc_global_is_modified, acc_global_time = acc_global(idf)
+    # 速度约束+加速度约束Global修复
+    acc_global_modified, acc_global_is_modified, acc_global_time = acc_global(idf)
     # print('{:=^80}'.format(' 全局速度约束+加速度约束修复数据集{} '.format(idf.dataset.upper())))
     # print('修复用时: {:.4g}ms'.format(acc_global_time))
     # print('修复值与正确值平均误差: {:.4g}'.format(delta(acc_global_modified, idf.clean)))
@@ -376,7 +379,7 @@ if __name__ == '__main__':
     # print('修复后约束违反率: {:.4g}'.format(violation_rate(acc_global_modified, idf.stcds, w)))
     #
     # # IMR修复
-    # imr_modified, imr_is_modified, imr_time = IMR(max_iter=1000).clean(idf)
+    imr_modified, imr_is_modified, imr_time = IMR(max_iter=1000).clean(idf)
     # print('{:=^80}'.format(' IMR算法修复数据集{} '.format(idf.dataset.upper())))
     # print('修复用时: {:.4g}ms'.format(imr_time))
     # print('修复值与正确值平均误差: {:.4g}'.format(delta(imr_modified, idf.clean)))
@@ -385,7 +388,7 @@ if __name__ == '__main__':
     # print('修复后约束违反率: {:.4g}'.format(violation_rate(imr_modified, idf.stcds, w)))
     #
     # # EWMA修复
-    # ewma_modified, ewma_is_modified, ewma_time = ewma(idf, beta=0.9)
+    ewma_modified, ewma_is_modified, ewma_time = ewma(idf, beta=0.9)
     # print('{:=^80}'.format(' EWMA算法修复数据集{} '.format(idf.dataset.upper())))
     # print('修复用时: {:.4g}ms'.format(ewma_time))
     # print('修复值与正确值平均误差: {:.4g}'.format(delta(ewma_modified, idf.clean)))
@@ -394,7 +397,7 @@ if __name__ == '__main__':
     # print('修复后约束违反率: {:.4g}'.format(violation_rate(ewma_modified, idf.stcds, w)))
     #
     # # 中值滤波器修复
-    # median_filter_modified, median_filter_is_modified, median_filter_time = median_filter(idf, w=10)
+    median_filter_modified, median_filter_is_modified, median_filter_time = median_filter(idf, w=10)
     # print('{:=^80}'.format(' 中值滤波修复数据集{} '.format(idf.dataset.upper())))
     # print('修复用时: {:.4g}ms'.format(median_filter_time))
     # print('修复值与正确值平均误差: {:.4g}'.format(delta(median_filter_modified, idf.clean)))
@@ -403,7 +406,7 @@ if __name__ == '__main__':
     # print('修复后约束违反率: {:.4g}'.format(violation_rate(median_filter_modified, idf.stcds, w)))
     #
     # # func-LP修复
-    # func_lp_modified, func_lp_is_modified, func_lp_time = func_lp(idf, w=w)
+    func_lp_modified, func_lp_is_modified, func_lp_time = func_lp(idf, w=w)
     # print('{:=^80}'.format(' func-LP修复数据集{} '.format(idf.dataset.upper())))
     # print('修复用时: {:.4g}ms'.format(func_lp_time))
     # print('修复值与正确值平均误差: {:.4g}'.format(delta(func_lp_modified, idf.clean)))
@@ -412,8 +415,8 @@ if __name__ == '__main__':
     # print('修复后约束违反率: {:.4g}'.format(violation_rate(func_lp_modified, idf.stcds, w)))
     #
     # # func-mvc修复sorted
-    # func_mvc_modified, func_mvc_is_modified, func_mvc_time = func_mvc(idf, w=w, mvc='sorted')
-    # print('{:=^80}'.format(' func-MVC修复数据集{} '.format(idf.dataset.upper())))
+    func_mvc_modified, func_mvc_is_modified, func_mvc_time = func_mvc(idf, w=w, mvc='sorted')
+    # print('{:=^80}'.format(' func-MVC修复数据集{} '.format(idf.dataset.up per())))
     # print('修复用时: {:.4g}ms'.format(func_mvc_time))
     # print('修复值与正确值平均误差: {:.4g}'.format(delta(func_mvc_modified, idf.clean)))
     # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, func_mvc_modified)))
@@ -431,3 +434,30 @@ if __name__ == '__main__':
     # print('{:=^80}'.format(' 函数依赖FD检测数据集{} '.format(idf.dataset.upper())))
     # print('检测用时: {:.4g}ms'.format(fd_time))
     # print('Precision: {:.4g}, Recall: {:.4g}, F1: {:.4g}'.format(fd_p, fd_r, fd_f1))
+
+    df = pd.DataFrame(columns=['tid', 'clean', 'origin',
+                               'LP', 'approx',
+                               'speed(L)', 'speed(G)', 'Acc(L)', 'Acc(G)',
+                               'IMR', 'Median', 'EWMA'])
+    idx = 0
+    for i in range(25, 50):
+        values = [i, idf.clean['U3_HNC10CT111'].values[i], idf.origin['U3_HNC10CT111'].values[i],
+                  func_lp_modified['U3_HNC10CT111'].values[i], func_mvc_modified['U3_HNC10CT111'].values[i],
+                  speed_local_modified['U3_HNC10CT111'].values[i], speed_global_modified['U3_HNC10CT111'].values[i],
+                  acc_local_modified['U3_HNC10CT111'].values[i], acc_global_modified['U3_HNC10CT111'].values[i],
+                  imr_modified['U3_HNC10CT111'].values[i], median_filter_modified['U3_HNC10CT111'].values[i], ewma_modified['U3_HNC10CT111'].values[i]]
+        print(values)
+        df.loc[idx] = values
+        idx += 1
+
+    df.set_index('tid', inplace=True)
+
+    df.to_csv(PROJECT_ROOT + '/continuous.csv')
+
+    plt.plot(df.index, df['origin'].values, marker='s', linestyle='-.', color='k', label='origin')
+    plt.plot(df.index, df['LP'].values, marker='*', linestyle='-.', color='g', label='LP')
+    plt.plot(df.index, df['speed(G)'].values, marker='+', linestyle='-.', color='b', label='Speed(G)')
+    plt.plot(df.index, df['IMR'].values, marker='x', linestyle='-.', color='pink', label='IMR')
+    plt.plot(df.index, df['Median'].values, marker='o', linestyle='-.', color='yellow', label='Median')
+    plt.legend()
+    plt.show()
