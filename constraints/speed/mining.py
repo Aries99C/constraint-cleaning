@@ -21,6 +21,10 @@ def mining_speed_constraints(mts, alpha=3, verbose=0):
         speed_lb = speed_mean - alpha * speed_std
         speed_ub = speed_mean + alpha * speed_std
 
+        if speed_lb == 0. and speed_ub == 0.:
+            speed_lb = -0.00001
+            speed_ub = 0.00001
+
         # 存储当前列上的速度约束
         speed_constraints[col] = (speed_lb, speed_ub)
         if verbose == 2:  # 需要显示的情况才存储，节省内存

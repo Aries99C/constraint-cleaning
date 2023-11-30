@@ -291,13 +291,10 @@ if __name__ == '__main__':
     # benchmark_performance(dataset='WADI', index_col='Row', datetime_index=False,
     #                       lens=range(5000, 20000 + 1, 5000),
     #                       ratios=np.arange(0.1, 0.3 + 0.01, 0.1))
-    benchmark_performance(dataset='SMD', index_col='Timestamp', datetime_index=False,
-                          lens=range(7000, 28000 + 1, 7000),
+    benchmark_performance(dataset='PUMP', index_col='time', datetime_index=False,
+                          lens=range(5000, 20000 + 1, 5000),
                           ratios=np.arange(0.1, 0.3 + 0.01, 0.1),
                           save=True)
-    # benchmark_performance(dataset='ASD', index_col='Timestamp', datetime_index=False,
-    #                       lens=range(2000, 8000 + 1, 2000),
-    #                       ratios=np.arange(0.1, 0.3 + 0.01, 0.1))
 
     # 消融实验-规则数影响
     # for n in range(1, 4):

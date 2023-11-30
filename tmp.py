@@ -1,5 +1,6 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 from utils import project_root
 
@@ -28,15 +29,30 @@ if __name__ == '__main__':
     #             else:
     #                 f.write('\n')
 
-    # 预处理SMD数据集
-    df = pd.read_csv(PROJECT_ROOT + '/data/SMD.csv', index_col='Timestamp')
+    df = pd.read_csv(PROJECT_ROOT + '/PUMP.csv', index_col='time')
+    df.drop(columns=['Label'], inplace=True)
 
-    df = df[:5500]
+    # df = df[['sensor0', 'sensor1']]
+    df = df[30000: 50000]
+    df = df[['sensor0', 'sensor1', 'sensor2', 'sensor32', 'sensor33', 'sensor34']]
 
-    df_norm = ((df - df.min()) / (df.max() - df.min())) * 50
+    for col in df.columns:
+        values = df[col].values
 
-    df_norm.to_csv(PROJECT_ROOT + './data/SMD_norm.csv')
+        speeds = np.diff(values)
+        s_mean = speeds.mean()
+        s_std = speeds.std()
 
-    df_norm.plot(subplots=True, figsize=(10, 10))
+        s_lb = s_mean - 2 * s_std
+        s_ub = s_mean + 2 * s_std
 
-    plt.show()
+        for i in range(10, len(values) - 10):
+            if values[i] - values[i-1] > s_ub or values[i] - values[i-1] < s_lb:
+                values[i] = np.mean(values[i-10:i+10])
+
+    df.to_csv(PROJECT_ROOT + '/data/PUMP.csv')
+
+    # df.plot(subplots=True, figsize=(10, 10))
+    # plt.show()
+
+    pass

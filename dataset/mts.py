@@ -252,13 +252,12 @@ class MTS(object):
         insert_size = 0
         error_size = int(ratio * self.len * self.dim)   # 计算错误总单元格
         while error_size > 0:
-            insert_attrs = random.sample(self.cols, int(ratio * self.dim))  # 随机注入部分属性
+            insert_attrs = random.sample(self.cols, max(int(ratio * self.dim), 2))      # 随机注入部分属性
             insert_len = random.randint(10, 50)                             # 随机的错误长度
             insert_pos = random.randint(20, self.len - insert_len - 1)      # 随机的注入位置
             for attr in insert_attrs:
                 if self.isDirty[attr].values[insert_pos]:   # 若已经注入过错误就跳过
                     continue
-
                 self.origin[attr].values[insert_pos: insert_pos + insert_len] \
                     += noise_df[attr].values[insert_pos: insert_pos + insert_len]       # 注入白噪声
                 error_size -= insert_len                                                # 更新错误数量
@@ -303,14 +302,44 @@ if __name__ == '__main__':
     # idf = MTS('idf', 'timestamp', True, size=2000, verbose=1)                     # 读取数据集
     # idf = MTS('SWaT', 'Timestamp', False, size=2000, verbose=1)
     # idf = MTS('WADI', 'Row', False, size=2000, verbose=1)
-    idf = MTS('SMD', 'Timestamp', False, size=5000, verbose=1)
-    # idf = MTS('ASD', 'Timestamp', False, size=2000, verbose=1)
+    idf = MTS('PUMP', 'time', False, size=5000, verbose=1)
 
-    idf.constraints_mining(w=w, verbose=1)                                          # 挖掘约束
-    # idf.constraints_mining(pre_mined=True, verbose=1)                               # 预配置约束集合
-    idf.insert_error(snr=30, verbose=1)                                             # 注入噪声
+    # idf.constraints_mining(w=w, verbose=1)                                          # 挖掘约束
+    idf.constraints_mining(pre_mined=True, verbose=1)                               # 预配置约束集合
+    idf.insert_error(snr=15, verbose=1)                                             # 注入噪声
 
-    # 速度约束Local修复
+    # 为HoloClean方法生成数据集和规则
+    idf.origin = idf.origin.round(2)
+    idf.origin.to_csv(PROJECT_ROOT + '/mts.csv', index=None)
+
+    with open(PROJECT_ROOT + '/mts_speed_constraint.txt', 'w') as f:
+        for constraint in idf.speed_constraints.items():
+            attr = constraint[0]
+            lb, ub = constraint[1]
+            f.write('{},{},{}\n'.format(attr, lb, ub))
+
+    idf.clean = idf.clean.round(2)
+    clean = pd.DataFrame(columns=['tid', 'attribute', 'correct_val'])
+    for i in range(idf.len):
+        for col in idf.clean.columns:
+            if idf.isDirty[col].values[i]:
+                clean.loc[len(clean)] = [i, col, idf.clean[col].values[i]]
+    clean.to_csv(PROJECT_ROOT + '/mts_clean.csv', index=None)
+    idf.clean.to_csv(PROJECT_ROOT + '/mts_label.csv', index=None)
+
+    with open(PROJECT_ROOT + '/mts_stcd.txt', 'w') as f:
+        for stcd in idf.stcds:
+            for i in range(len(stcd.alpha)):
+                f.write('{}'.format(stcd.alpha[i]))
+                if i < len(stcd.alpha) - 1:
+                    f.write(',')
+                else:
+                    f.write(';')
+            f.write('{};'.format(stcd.func['intercept']))
+            f.write('{},{}\n'.format(stcd.lb, stcd.ub))
+
+    # 修复
+    # # 速度约束Local修复
     # speed_local_modified, speed_local_is_modified, speed_local_time = speed_local(idf, w=w)
     # print('{:=^80}'.format(' 局部速度约束修复数据集{} '.format(idf.dataset.upper())))
     # print('修复用时: {:.4g}ms'.format(speed_local_time))
@@ -318,8 +347,8 @@ if __name__ == '__main__':
     # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, speed_local_modified)))
     # print('修复后约束违反程度: {:.4g}'.format(check_repair_violation(speed_local_modified, idf.stcds, w)))
     # print('修复后约束违反率: {:.4g}'.format(violation_rate(speed_local_modified, idf.stcds, w)))
-
-    # 速度约束Global修复
+    #
+    # # 速度约束Global修复
     # speed_global_modified, speed_global_is_modified, speed_global_time = speed_global(idf, w=w, x=10)
     # print('{:=^80}'.format(' 全局速度约束修复数据集{} '.format(idf.dataset.upper())))
     # print('修复用时: {:.4g}ms'.format(speed_global_time))
@@ -327,8 +356,8 @@ if __name__ == '__main__':
     # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, speed_global_modified)))
     # print('修复后约束违反程度: {:.4g}'.format(check_repair_violation(speed_global_modified, idf.stcds, w)))
     # print('修复后约束违反率: {:.4g}'.format(violation_rate(speed_global_modified, idf.stcds, w)))
-
-    # 速度约束+加速度约束Local修复
+    #
+    # # 速度约束+加速度约束Local修复
     # acc_local_modified, acc_local_is_modified, acc_local_time = acc_local(idf)
     # print('{:=^80}'.format(' 局部速度约束+加速度约束修复数据集{} '.format(idf.dataset.upper())))
     # print('修复用时: {:.4g}ms'.format(acc_local_time))
@@ -336,8 +365,8 @@ if __name__ == '__main__':
     # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, acc_local_modified)))
     # print('修复后约束违反程度: {:.4g}'.format(check_repair_violation(acc_local_modified, idf.stcds, w)))
     # print('修复后约束违反率: {:.4g}'.format(violation_rate(acc_local_modified, idf.stcds, w)))
-
-    # 速度约束+加速度约束Global修复
+    #
+    # # 速度约束+加速度约束Global修复
     # acc_global_modified, acc_global_is_modified, acc_global_time = acc_global(idf)
     # print('{:=^80}'.format(' 全局速度约束+加速度约束修复数据集{} '.format(idf.dataset.upper())))
     # print('修复用时: {:.4g}ms'.format(acc_global_time))
@@ -345,8 +374,8 @@ if __name__ == '__main__':
     # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, acc_global_modified)))
     # print('修复后约束违反程度: {:.4g}'.format(check_repair_violation(acc_global_modified, idf.stcds, w)))
     # print('修复后约束违反率: {:.4g}'.format(violation_rate(acc_global_modified, idf.stcds, w)))
-
-    # IMR修复
+    #
+    # # IMR修复
     # imr_modified, imr_is_modified, imr_time = IMR(max_iter=1000).clean(idf)
     # print('{:=^80}'.format(' IMR算法修复数据集{} '.format(idf.dataset.upper())))
     # print('修复用时: {:.4g}ms'.format(imr_time))
@@ -354,8 +383,8 @@ if __name__ == '__main__':
     # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, imr_modified)))
     # print('修复后约束违反程度: {:.4g}'.format(check_repair_violation(imr_modified, idf.stcds, w)))
     # print('修复后约束违反率: {:.4g}'.format(violation_rate(imr_modified, idf.stcds, w)))
-
-    # EWMA修复
+    #
+    # # EWMA修复
     # ewma_modified, ewma_is_modified, ewma_time = ewma(idf, beta=0.9)
     # print('{:=^80}'.format(' EWMA算法修复数据集{} '.format(idf.dataset.upper())))
     # print('修复用时: {:.4g}ms'.format(ewma_time))
@@ -363,8 +392,8 @@ if __name__ == '__main__':
     # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, ewma_modified)))
     # print('修复后约束违反程度: {:.4g}'.format(check_repair_violation(ewma_modified, idf.stcds, w)))
     # print('修复后约束违反率: {:.4g}'.format(violation_rate(ewma_modified, idf.stcds, w)))
-
-    # 中值滤波器修复
+    #
+    # # 中值滤波器修复
     # median_filter_modified, median_filter_is_modified, median_filter_time = median_filter(idf, w=10)
     # print('{:=^80}'.format(' 中值滤波修复数据集{} '.format(idf.dataset.upper())))
     # print('修复用时: {:.4g}ms'.format(median_filter_time))
@@ -372,8 +401,8 @@ if __name__ == '__main__':
     # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, median_filter_modified)))
     # print('修复后约束违反程度: {:.4g}'.format(check_repair_violation(median_filter_modified, idf.stcds, w)))
     # print('修复后约束违反率: {:.4g}'.format(violation_rate(median_filter_modified, idf.stcds, w)))
-
-    # func-LP修复
+    #
+    # # func-LP修复
     # func_lp_modified, func_lp_is_modified, func_lp_time = func_lp(idf, w=w)
     # print('{:=^80}'.format(' func-LP修复数据集{} '.format(idf.dataset.upper())))
     # print('修复用时: {:.4g}ms'.format(func_lp_time))
@@ -381,15 +410,8 @@ if __name__ == '__main__':
     # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, func_lp_modified)))
     # print('修复后约束违反程度: {:.4g}'.format(check_repair_violation(func_lp_modified, idf.stcds, w)))
     # print('修复后约束违反率: {:.4g}'.format(violation_rate(func_lp_modified, idf.stcds, w)))
-
-    # func-mvc修复base
-    # func_mvc_modified, func_mvc_is_modified, func_mvc_time = func_mvc(idf, w=w, mvc='base')
-    # print('{:=^80}'.format(' func-MVC修复数据集{} '.format(idf.dataset.upper())))
-    # print('修复用时: {:.4g}ms'.format(func_mvc_time))
-    # print('修复值与正确值平均误差: {:.4g}'.format(delta(func_mvc_modified, idf.clean)))
-    # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, func_mvc_modified)))
-
-    # func-mvc修复sorted
+    #
+    # # func-mvc修复sorted
     # func_mvc_modified, func_mvc_is_modified, func_mvc_time = func_mvc(idf, w=w, mvc='sorted')
     # print('{:=^80}'.format(' func-MVC修复数据集{} '.format(idf.dataset.upper())))
     # print('修复用时: {:.4g}ms'.format(func_mvc_time))
@@ -398,11 +420,11 @@ if __name__ == '__main__':
     # print('修复后约束违反程度: {:.4g}'.format(check_repair_violation(func_mvc_modified, idf.stcds, w)))
     # print('修复后约束违反率: {:.4g}'.format(violation_rate(func_mvc_modified, idf.stcds, w)))
 
-    idf.clean.plot(subplots=True, figsize=(10, 10))
-    idf.origin.plot(subplots=True, figsize=(10, 10))
-    func_lp_modified.plot(subplots=True, figsize=(10, 10))
-    func_mvc_modified.plot(subplots=True, figsize=(10, 10))
-    plt.show()
+    # idf.clean.plot(subplots=True, figsize=(10, 10))
+    # idf.origin.plot(subplots=True, figsize=(10, 10))
+    # func_lp_modified.plot(subplots=True, figsize=(10, 10))
+    # func_mvc_modified.plot(subplots=True, figsize=(10, 10))
+    # plt.show()
 
     # fd_modified, fd_is_modified, fd_time = fd_detect(idf)
     # fd_p, fd_r, fd_f1 = f1(fd_is_modified, idf.isDirty)
