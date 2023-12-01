@@ -238,10 +238,18 @@ class MTS(object):
         self.isLabel[:5] = True             # 为IMR算法提供最基础的标签
 
         # 向观测值注入错误
-        # 样例错误 U3_HNC10CT111
+        # 连续错误 U3_HNC10CT111
         self.origin['U3_HNC10CT111'].values[30: 45] += 2.
         self.isDirty['U3_HNC10CT111'].values[30: 45] = True
         self.isLabel['U3_HNC10CT111'].values[36] = True
+        # 趋势错误
+        self.origin['U3_HNC10CT111'].values[80: 95] += np.array([x * 0.1 for x in range(15)])
+        self.isDirty['U3_HNC10CT111'].values[80: 95] = True
+        self.isLabel['U3_HNC10CT111'].values[90] = True
+        # 反向趋势错误
+        self.origin['U3_HNC10CT111'].values[200: 215] += np.array([x * 0.1 for x in range(15, 0, -1)])
+        self.isDirty['U3_HNC10CT111'].values[200: 215] = True
+        self.isLabel['U3_HNC10CT111'].values[210] = True
 
         # 先根据信噪比生成白噪声
         noise_df = self.clean.copy(deep=True)   # 拷贝DataFrame格式
@@ -272,6 +280,7 @@ class MTS(object):
         # 拷贝待修复值，后续将在待修复值上进行修改
         self.modified = self.origin.copy(deep=True)
 
+        self.isModified = self.origin.copy(deep=True)
         for col in self.isModified.columns:
             self.isModified[col] = False    # 全部初始化为False
 
@@ -312,38 +321,38 @@ if __name__ == '__main__':
     idf.insert_error(snr=15, verbose=1)                                             # 注入噪声
 
     # 为HoloClean方法生成数据集和规则
-    idf.origin = idf.origin.round(2)
-    idf.origin.to_csv(PROJECT_ROOT + '/mts.csv', index=None)
-
-    with open(PROJECT_ROOT + '/mts_speed_constraint.txt', 'w') as f:
-        for constraint in idf.speed_constraints.items():
-            attr = constraint[0]
-            lb, ub = constraint[1]
-            f.write('{},{},{}\n'.format(attr, lb, ub))
-
-    idf.clean = idf.clean.round(2)
-    clean = pd.DataFrame(columns=['tid', 'attribute', 'correct_val'])
-    for i in range(idf.len):
-        for col in idf.clean.columns:
-            if idf.isDirty[col].values[i]:
-                clean.loc[len(clean)] = [i, col, idf.clean[col].values[i]]
-    clean.to_csv(PROJECT_ROOT + '/mts_clean.csv', index=None)
-    idf.clean.to_csv(PROJECT_ROOT + '/mts_label.csv', index=None)
-
-    with open(PROJECT_ROOT + '/mts_stcd.txt', 'w') as f:
-        for stcd in idf.stcds:
-            for i in range(len(stcd.alpha)):
-                f.write('{}'.format(stcd.alpha[i]))
-                if i < len(stcd.alpha) - 1:
-                    f.write(',')
-                else:
-                    f.write(';')
-            f.write('{};'.format(stcd.func['intercept']))
-            f.write('{},{}\n'.format(stcd.lb, stcd.ub))
+    # idf.origin = idf.origin.round(2)
+    # idf.origin.to_csv(PROJECT_ROOT + '/mts.csv', index=None)
+    #
+    # with open(PROJECT_ROOT + '/mts_speed_constraint.txt', 'w') as f:
+    #     for constraint in idf.speed_constraints.items():
+    #         attr = constraint[0]
+    #         lb, ub = constraint[1]
+    #         f.write('{},{},{}\n'.format(attr, lb, ub))
+    #
+    # idf.clean = idf.clean.round(2)
+    # clean = pd.DataFrame(columns=['tid', 'attribute', 'correct_val'])
+    # for i in range(idf.len):
+    #     for col in idf.clean.columns:
+    #         if idf.isDirty[col].values[i]:
+    #             clean.loc[len(clean)] = [i, col, idf.clean[col].values[i]]
+    # clean.to_csv(PROJECT_ROOT + '/mts_clean.csv', index=None)
+    # idf.clean.to_csv(PROJECT_ROOT + '/mts_label.csv', index=None)
+    #
+    # with open(PROJECT_ROOT + '/mts_stcd.txt', 'w') as f:
+    #     for stcd in idf.stcds:
+    #         for i in range(len(stcd.alpha)):
+    #             f.write('{}'.format(stcd.alpha[i]))
+    #             if i < len(stcd.alpha) - 1:
+    #                 f.write(',')
+    #             else:
+    #                 f.write(';')
+    #         f.write('{};'.format(stcd.func['intercept']))
+    #         f.write('{},{}\n'.format(stcd.lb, stcd.ub))
 
     # 修复
     # # 速度约束Local修复
-    speed_local_modified, speed_local_is_modified, speed_local_time = speed_local(idf, w=w)
+    # speed_local_modified, speed_local_is_modified, speed_local_time = speed_local(idf, w=w)
     # print('{:=^80}'.format(' 局部速度约束修复数据集{} '.format(idf.dataset.upper())))
     # print('修复用时: {:.4g}ms'.format(speed_local_time))
     # print('修复值与正确值平均误差: {:.4g}'.format(delta(speed_local_modified, idf.clean)))
@@ -352,7 +361,7 @@ if __name__ == '__main__':
     # print('修复后约束违反率: {:.4g}'.format(violation_rate(speed_local_modified, idf.stcds, w)))
     #
     # # 速度约束Global修复
-    speed_global_modified, speed_global_is_modified, speed_global_time = speed_global(idf, w=w, x=10)
+    # speed_global_modified, speed_global_is_modified, speed_global_time = speed_global(idf, w=w, x=10)
     # print('{:=^80}'.format(' 全局速度约束修复数据集{} '.format(idf.dataset.upper())))
     # print('修复用时: {:.4g}ms'.format(speed_global_time))
     # print('修复值与正确值平均误差: {:.4g}'.format(delta(speed_global_modified, idf.clean)))
@@ -361,7 +370,7 @@ if __name__ == '__main__':
     # print('修复后约束违反率: {:.4g}'.format(violation_rate(speed_global_modified, idf.stcds, w)))
     #
     # # 速度约束+加速度约束Local修复
-    acc_local_modified, acc_local_is_modified, acc_local_time = acc_local(idf)
+    # acc_local_modified, acc_local_is_modified, acc_local_time = acc_local(idf)
     # print('{:=^80}'.format(' 局部速度约束+加速度约束修复数据集{} '.format(idf.dataset.upper())))
     # print('修复用时: {:.4g}ms'.format(acc_local_time))
     # print('修复值与正确值平均误差: {:.4g}'.format(delta(acc_local_modified, idf.clean)))
@@ -370,7 +379,7 @@ if __name__ == '__main__':
     # print('修复后约束违反率: {:.4g}'.format(violation_rate(acc_local_modified, idf.stcds, w)))
     #
     # 速度约束+加速度约束Global修复
-    acc_global_modified, acc_global_is_modified, acc_global_time = acc_global(idf)
+    # acc_global_modified, acc_global_is_modified, acc_global_time = acc_global(idf)
     # print('{:=^80}'.format(' 全局速度约束+加速度约束修复数据集{} '.format(idf.dataset.upper())))
     # print('修复用时: {:.4g}ms'.format(acc_global_time))
     # print('修复值与正确值平均误差: {:.4g}'.format(delta(acc_global_modified, idf.clean)))
@@ -379,7 +388,7 @@ if __name__ == '__main__':
     # print('修复后约束违反率: {:.4g}'.format(violation_rate(acc_global_modified, idf.stcds, w)))
     #
     # # IMR修复
-    imr_modified, imr_is_modified, imr_time = IMR(max_iter=1000).clean(idf)
+    # imr_modified, imr_is_modified, imr_time = IMR(max_iter=1000).clean(idf)
     # print('{:=^80}'.format(' IMR算法修复数据集{} '.format(idf.dataset.upper())))
     # print('修复用时: {:.4g}ms'.format(imr_time))
     # print('修复值与正确值平均误差: {:.4g}'.format(delta(imr_modified, idf.clean)))
@@ -388,7 +397,7 @@ if __name__ == '__main__':
     # print('修复后约束违反率: {:.4g}'.format(violation_rate(imr_modified, idf.stcds, w)))
     #
     # # EWMA修复
-    ewma_modified, ewma_is_modified, ewma_time = ewma(idf, beta=0.9)
+    # ewma_modified, ewma_is_modified, ewma_time = ewma(idf, beta=0.9)
     # print('{:=^80}'.format(' EWMA算法修复数据集{} '.format(idf.dataset.upper())))
     # print('修复用时: {:.4g}ms'.format(ewma_time))
     # print('修复值与正确值平均误差: {:.4g}'.format(delta(ewma_modified, idf.clean)))
@@ -397,7 +406,7 @@ if __name__ == '__main__':
     # print('修复后约束违反率: {:.4g}'.format(violation_rate(ewma_modified, idf.stcds, w)))
     #
     # # 中值滤波器修复
-    median_filter_modified, median_filter_is_modified, median_filter_time = median_filter(idf, w=10)
+    # median_filter_modified, median_filter_is_modified, median_filter_time = median_filter(idf, w=10)
     # print('{:=^80}'.format(' 中值滤波修复数据集{} '.format(idf.dataset.upper())))
     # print('修复用时: {:.4g}ms'.format(median_filter_time))
     # print('修复值与正确值平均误差: {:.4g}'.format(delta(median_filter_modified, idf.clean)))
@@ -406,7 +415,7 @@ if __name__ == '__main__':
     # print('修复后约束违反率: {:.4g}'.format(violation_rate(median_filter_modified, idf.stcds, w)))
     #
     # # func-LP修复
-    func_lp_modified, func_lp_is_modified, func_lp_time = func_lp(idf, w=w)
+    # func_lp_modified, func_lp_is_modified, func_lp_time = func_lp(idf, w=w)
     # print('{:=^80}'.format(' func-LP修复数据集{} '.format(idf.dataset.upper())))
     # print('修复用时: {:.4g}ms'.format(func_lp_time))
     # print('修复值与正确值平均误差: {:.4g}'.format(delta(func_lp_modified, idf.clean)))
@@ -415,7 +424,7 @@ if __name__ == '__main__':
     # print('修复后约束违反率: {:.4g}'.format(violation_rate(func_lp_modified, idf.stcds, w)))
     #
     # # func-mvc修复sorted
-    func_mvc_modified, func_mvc_is_modified, func_mvc_time = func_mvc(idf, w=w, mvc='sorted')
+    # func_mvc_modified, func_mvc_is_modified, func_mvc_time = func_mvc(idf, w=w, mvc='sorted')
     # print('{:=^80}'.format(' func-MVC修复数据集{} '.format(idf.dataset.up per())))
     # print('修复用时: {:.4g}ms'.format(func_mvc_time))
     # print('修复值与正确值平均误差: {:.4g}'.format(delta(func_mvc_modified, idf.clean)))
@@ -435,29 +444,92 @@ if __name__ == '__main__':
     # print('检测用时: {:.4g}ms'.format(fd_time))
     # print('Precision: {:.4g}, Recall: {:.4g}, F1: {:.4g}'.format(fd_p, fd_r, fd_f1))
 
-    df = pd.DataFrame(columns=['tid', 'clean', 'origin',
-                               'LP', 'approx',
-                               'speed(L)', 'speed(G)', 'Acc(L)', 'Acc(G)',
-                               'IMR', 'Median', 'EWMA'])
-    idx = 0
-    for i in range(25, 50):
-        values = [i, idf.clean['U3_HNC10CT111'].values[i], idf.origin['U3_HNC10CT111'].values[i],
-                  func_lp_modified['U3_HNC10CT111'].values[i], func_mvc_modified['U3_HNC10CT111'].values[i],
-                  speed_local_modified['U3_HNC10CT111'].values[i], speed_global_modified['U3_HNC10CT111'].values[i],
-                  acc_local_modified['U3_HNC10CT111'].values[i], acc_global_modified['U3_HNC10CT111'].values[i],
-                  imr_modified['U3_HNC10CT111'].values[i], median_filter_modified['U3_HNC10CT111'].values[i], ewma_modified['U3_HNC10CT111'].values[i]]
-        print(values)
-        df.loc[idx] = values
-        idx += 1
+    # 修复示例图
+    # speed_local_modified, speed_local_is_modified, speed_local_time = speed_local(idf, w=w)
+    # speed_global_modified, speed_global_is_modified, speed_global_time = speed_global(idf, w=w, x=10)
+    # acc_local_modified, acc_local_is_modified, acc_local_time = acc_local(idf)
+    # acc_global_modified, acc_global_is_modified, acc_global_time = acc_global(idf)
+    # imr_modified, imr_is_modified, imr_time = IMR(max_iter=1000).clean(idf)
+    # ewma_modified, ewma_is_modified, ewma_time = ewma(idf, beta=0.9)
+    # median_filter_modified, median_filter_is_modified, median_filter_time = median_filter(idf, w=10)
+    # func_lp_modified, func_lp_is_modified, func_lp_time = func_lp(idf, w=w)
+    # func_mvc_modified, func_mvc_is_modified, func_mvc_time = func_mvc(idf, w=w, mvc='sorted')
 
-    df.set_index('tid', inplace=True)
+    # start = -1
+    # end = -1
+    # for i in range(300, idf.len):
+    #     if start == -1 and idf.isDirty['U3_HNC10CT111'].values[i]:
+    #         start = i
+    #     if (not start == -1) and (not idf.isDirty['U3_HNC10CT111'].values[i]):
+    #         end = i
+    #         break
 
-    df.to_csv(PROJECT_ROOT + '/continuous.csv')
+    # df = pd.DataFrame(columns=['tid', 'clean', 'origin',
+    #                            'LP', 'approx',
+    #                            'speed(L)', 'speed(G)', 'Acc(L)', 'Acc(G)',
+    #                            'IMR', 'Median', 'EWMA'])
+    # idx = 0
+    # # for i in range(start - 5, end + 5):
+    # for i in range(200 - 5, 215 + 5):
+    #     values = [i, idf.clean['U3_HNC10CT111'].values[i], idf.origin['U3_HNC10CT111'].values[i],
+    #               func_lp_modified['U3_HNC10CT111'].values[i], func_mvc_modified['U3_HNC10CT111'].values[i],
+    #               speed_local_modified['U3_HNC10CT111'].values[i], speed_global_modified['U3_HNC10CT111'].values[i],
+    #               acc_local_modified['U3_HNC10CT111'].values[i], acc_global_modified['U3_HNC10CT111'].values[i],
+    #               imr_modified['U3_HNC10CT111'].values[i], median_filter_modified['U3_HNC10CT111'].values[i], ewma_modified['U3_HNC10CT111'].values[i]]
+    #     df.loc[idx] = values
+    #     idx += 1
+    #
+    # df.set_index('tid', inplace=True)
 
-    plt.plot(df.index, df['origin'].values, marker='s', linestyle='-.', color='k', label='origin')
-    plt.plot(df.index, df['LP'].values, marker='*', linestyle='-.', color='g', label='LP')
-    plt.plot(df.index, df['speed(G)'].values, marker='+', linestyle='-.', color='b', label='Speed(G)')
-    plt.plot(df.index, df['IMR'].values, marker='x', linestyle='-.', color='pink', label='IMR')
-    plt.plot(df.index, df['Median'].values, marker='o', linestyle='-.', color='yellow', label='Median')
-    plt.legend()
-    plt.show()
+    # df.to_csv(PROJECT_ROOT + '/continuous.csv')
+    # df.to_csv(PROJECT_ROOT + '/trend.csv')
+    # df.to_csv(PROJECT_ROOT + '/reverse_trend.csv')
+    # df.to_csv(PROJECT_ROOT + '/noise.csv')
+
+    # df = pd.read_csv(PROJECT_ROOT + '/continuous.csv', index_col='tid')
+    # df = pd.read_csv(PROJECT_ROOT + '/trend.csv', index_col='tid')
+    # df = pd.read_csv(PROJECT_ROOT + '/reverse_trend.csv', index_col='tid')
+    df = pd.read_csv(PROJECT_ROOT + '/noise.csv', index_col='tid')
+
+    plt.rcParams['xtick.direction'] = 'in'
+    plt.rcParams['ytick.direction'] = 'in'
+
+    # 引言图
+    fig, ax = plt.subplots(figsize=(5, 3))
+
+    # ax.plot(df.index, df['LP'].values, marker='H', linestyle='-', color='seagreen', label='LP', markersize=4, linewidth=1.5)
+    # ax.plot(df.index, df['speed(L)'].values, marker='D', linestyle='-', color='red', label='Speed(L)', markersize=4, linewidth=1.5)
+    # ax.plot(df.index, df['speed(G)'].values, marker='d', linestyle='-', color='royalblue', label='Speed(G)', markersize=4, linewidth=1.5)
+    # ax.plot(df.index, df['IMR'].values, marker='x', linestyle='-', color='hotpink', label='IMR', markersize=4, linewidth=1.5)
+    # ax.plot(df.index, df['Median'].values, marker='s', linestyle='-', color='gold', label='Median', markersize=3, linewidth=1.5)
+    # ax.plot(df.index, df['origin'].values, marker='o', linestyle='-', color='black', label='origin', markersize=3, linewidth=1.5)
+
+    ax.plot(df.index, df['LP'].values, marker='o', linestyle='-', color='orangered', label='MTSClean', markersize=3,
+            linewidth=1.5)
+    ax.plot(df.index, df['speed(L)'].values, marker='o', linestyle='-', color='teal', label='Speed(L)', markersize=3,
+            linewidth=1.5)
+    ax.plot(df.index, df['speed(G)'].values, marker='o', linestyle='-', color='deepskyblue', label='Speed(G)',
+            markersize=3, linewidth=1.5)
+    ax.plot(df.index, df['IMR'].values, marker='o', linestyle='-', color='dodgerblue', label='IMR', markersize=3,
+            linewidth=1.5)
+    ax.plot(df.index, df['Median'].values, marker='o', linestyle='-', color='royalblue', label='Median', markersize=3,
+            linewidth=1.5)
+    ax.plot(df.index, df['origin'].values, marker='o', linestyle='-', color='black', label='origin', markersize=3,
+            linewidth=1.5)
+
+    # ax.fill_between(df.index, idf.clean['U3_HNC10CT111'].values[25: 50], idf.clean['U3_HNV10CT111'].values[25: 50] * 0.163 + 47.642 + 0.085 + 0.25, label='bound', facecolor='grey', alpha=0.3)
+
+    ax.set_xlabel('timestamp')
+    ax.set_ylabel('U3_HNC10CT111')
+
+    ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
+
+    # plt.savefig(PROJECT_ROOT + '/continuous.png', bbox_inches='tight', pad_inches=0.02, dpi=300)
+    # plt.savefig(PROJECT_ROOT + '/trend.png', bbox_inches='tight', pad_inches=0.02, dpi=300)
+    # plt.savefig(PROJECT_ROOT + '/reverse_trend.png', bbox_inches='tight', pad_inches=0.02, dpi=300)
+    # plt.savefig(PROJECT_ROOT + '/noise.png', bbox_inches='tight', pad_inches=0.02, dpi=300)
+
+    # plt.savefig(PROJECT_ROOT + '/continuous_color.png', bbox_inches='tight', pad_inches=0.02, dpi=300)
+    # plt.savefig(PROJECT_ROOT + '/trend_color.png', bbox_inches='tight', pad_inches=0.02, dpi=300)
+    # plt.savefig(PROJECT_ROOT + '/reverse_trend_color.png', bbox_inches='tight', pad_inches=0.02, dpi=300)
+    plt.savefig(PROJECT_ROOT + '/noise_color.png', bbox_inches='tight', pad_inches=0.02, dpi=300)
