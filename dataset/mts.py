@@ -1,6 +1,7 @@
 import random
 import math
 
+import hypernetx
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -18,6 +19,7 @@ from constraints.rfd.IsCover import is_cover_mining_rfd
 
 from cleaning.benchmark import delta, raa, check_repair_violation, violation_rate, speed_local, speed_global, acc_local, acc_global, IMR, ewma, median_filter, func_lp, func_mvc
 from cleaning.benchmark import f1, fd_detect
+from cleaning.benchmark import array2window
 
 pd.set_option('display.max_rows', 20)
 pd.set_option('display.max_columns', 100)
@@ -489,14 +491,16 @@ if __name__ == '__main__':
     # df = pd.read_csv(PROJECT_ROOT + '/continuous.csv', index_col='tid')
     # df = pd.read_csv(PROJECT_ROOT + '/trend.csv', index_col='tid')
     # df = pd.read_csv(PROJECT_ROOT + '/reverse_trend.csv', index_col='tid')
-    df = pd.read_csv(PROJECT_ROOT + '/noise.csv', index_col='tid')
+    # df = pd.read_csv(PROJECT_ROOT + '/noise.csv', index_col='tid')
 
-    plt.rcParams['xtick.direction'] = 'in'
-    plt.rcParams['ytick.direction'] = 'in'
+    # 画图设置
+    # plt.rcParams['xtick.direction'] = 'in'
+    # plt.rcParams['ytick.direction'] = 'in'
 
     # 引言图
-    fig, ax = plt.subplots(figsize=(5, 3))
+    # fig, ax = plt.subplots(figsize=(5, 3))
 
+    # 画图样式
     # ax.plot(df.index, df['LP'].values, marker='H', linestyle='-', color='seagreen', label='LP', markersize=4, linewidth=1.5)
     # ax.plot(df.index, df['speed(L)'].values, marker='D', linestyle='-', color='red', label='Speed(L)', markersize=4, linewidth=1.5)
     # ax.plot(df.index, df['speed(G)'].values, marker='d', linestyle='-', color='royalblue', label='Speed(G)', markersize=4, linewidth=1.5)
@@ -504,25 +508,27 @@ if __name__ == '__main__':
     # ax.plot(df.index, df['Median'].values, marker='s', linestyle='-', color='gold', label='Median', markersize=3, linewidth=1.5)
     # ax.plot(df.index, df['origin'].values, marker='o', linestyle='-', color='black', label='origin', markersize=3, linewidth=1.5)
 
-    ax.plot(df.index, df['LP'].values, marker='o', linestyle='-', color='orangered', label='MTSClean', markersize=3,
-            linewidth=1.5)
-    ax.plot(df.index, df['speed(L)'].values, marker='o', linestyle='-', color='teal', label='Speed(L)', markersize=3,
-            linewidth=1.5)
-    ax.plot(df.index, df['speed(G)'].values, marker='o', linestyle='-', color='deepskyblue', label='Speed(G)',
-            markersize=3, linewidth=1.5)
-    ax.plot(df.index, df['IMR'].values, marker='o', linestyle='-', color='dodgerblue', label='IMR', markersize=3,
-            linewidth=1.5)
-    ax.plot(df.index, df['Median'].values, marker='o', linestyle='-', color='royalblue', label='Median', markersize=3,
-            linewidth=1.5)
-    ax.plot(df.index, df['origin'].values, marker='o', linestyle='-', color='black', label='origin', markersize=3,
-            linewidth=1.5)
+    # 另一种画图样式
+    # ax.plot(df.index, df['LP'].values, marker='o', linestyle='-', color='orangered', label='MTSClean', markersize=3,
+    #         linewidth=1.5)
+    # ax.plot(df.index, df['speed(L)'].values, marker='o', linestyle='-', color='teal', label='Speed(L)', markersize=3,
+    #         linewidth=1.5)
+    # ax.plot(df.index, df['speed(G)'].values, marker='o', linestyle='-', color='deepskyblue', label='Speed(G)',
+    #         markersize=3, linewidth=1.5)
+    # ax.plot(df.index, df['IMR'].values, marker='o', linestyle='-', color='dodgerblue', label='IMR', markersize=3,
+    #         linewidth=1.5)
+    # ax.plot(df.index, df['Median'].values, marker='o', linestyle='-', color='royalblue', label='Median', markersize=3,
+    #         linewidth=1.5)
+    # ax.plot(df.index, df['origin'].values, marker='o', linestyle='-', color='black', label='origin', markersize=3,
+    #         linewidth=1.5)
 
+    # 可能需要的约束范围
     # ax.fill_between(df.index, idf.clean['U3_HNC10CT111'].values[25: 50], idf.clean['U3_HNV10CT111'].values[25: 50] * 0.163 + 47.642 + 0.085 + 0.25, label='bound', facecolor='grey', alpha=0.3)
 
-    ax.set_xlabel('timestamp')
-    ax.set_ylabel('U3_HNC10CT111')
-
-    ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
+    # ax.set_xlabel('timestamp')
+    # ax.set_ylabel('U3_HNC10CT111')
+    #
+    # ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
 
     # plt.savefig(PROJECT_ROOT + '/continuous.png', bbox_inches='tight', pad_inches=0.02, dpi=300)
     # plt.savefig(PROJECT_ROOT + '/trend.png', bbox_inches='tight', pad_inches=0.02, dpi=300)
@@ -532,4 +538,21 @@ if __name__ == '__main__':
     # plt.savefig(PROJECT_ROOT + '/continuous_color.png', bbox_inches='tight', pad_inches=0.02, dpi=300)
     # plt.savefig(PROJECT_ROOT + '/trend_color.png', bbox_inches='tight', pad_inches=0.02, dpi=300)
     # plt.savefig(PROJECT_ROOT + '/reverse_trend_color.png', bbox_inches='tight', pad_inches=0.02, dpi=300)
-    plt.savefig(PROJECT_ROOT + '/noise_color.png', bbox_inches='tight', pad_inches=0.02, dpi=300)
+    # plt.savefig(PROJECT_ROOT + '/noise_color.png', bbox_inches='tight', pad_inches=0.02, dpi=300)
+
+    # 绘制超图
+    t = array2window(idf.origin.values, win_size=w)[90]
+
+    hypergraph_df = pd.DataFrame(columns=['edge', 'vertex', 'weight'])
+    edge_num = 1
+    for stcd in idf.stcds:
+        degree = stcd.violation_degree(t)
+        if degree > 0:
+            for x_name in stcd.x_names:
+                hypergraph_df.loc[len(hypergraph_df)] = ['e{}'.format(edge_num), x_name[1], degree]
+            hypergraph_df.loc[len(hypergraph_df)] = ['e{}'.format(edge_num), stcd.y_name[1], degree]
+            edge_num += 1
+
+    H = hypernetx.Hypergraph(hypergraph_df, edge_col='edge', node_col='vertex', cell_weight_col='weight')
+    hypernetx.drawing.draw(H)
+    plt.show()
