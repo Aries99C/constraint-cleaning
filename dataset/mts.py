@@ -93,7 +93,7 @@ class MTS(object):
             if verbose == 2:    # 显示数据集概览
                 print(self.clean)
 
-    def constraints_mining(self, pre_mined=False, mining_constraints=None, w=2, n_component=1, verbose=0):
+    def constraints_mining(self, pre_mined=False, mining_constraints=None, w=2, n_component=1, confidence=0.999, verbose=0):
         """
         根据多元时序数据的正确值挖掘规则，包括行约束和列约束
         :param pre_mined: 预挖掘标记，为True时直接读取已挖掘的约束
@@ -188,7 +188,7 @@ class MTS(object):
                 with open(PROJECT_ROOT + '/constraints/rules/{}_acc.txt'.format(self.dataset), 'wb') as f:
                     pickle.dump(self.acc_constraints, f)  # pickle序列化加速度约束
             if 'stcd' in self.mining_constraints:   # 支持时窗约束
-                self.stcds = mining_stcd(self, win_size=w, n_components=n_component, verbose=verbose)
+                self.stcds = mining_stcd(self, win_size=w, n_components=n_component, confidence=confidence, verbose=verbose)
                 with open(PROJECT_ROOT + '/constraints/rules/{}_stcd.txt'.format(self.dataset), 'wb') as f:
                     pickle.dump(self.stcds, f)  # pickle序列化时窗约束
             if 'crr' in self.mining_constraints:    # 支持crr
@@ -313,14 +313,14 @@ if __name__ == '__main__':
     # 实验参数
     w = 2
 
-    idf = MTS('idf', 'timestamp', True, size=2000, verbose=1)                     # 读取数据集
+    idf = MTS('idf', 'timestamp', True, size=20000, verbose=1)                     # 读取数据集
     # idf = MTS('SWaT', 'Timestamp', False, size=2000, verbose=1)
     # idf = MTS('WADI', 'Row', False, size=2000, verbose=1)
     # idf = MTS('PUMP', 'time', False, size=5000, verbose=1)
 
-    # idf.constraints_mining(w=w, verbose=1)                                          # 挖掘约束
-    idf.constraints_mining(pre_mined=True, verbose=1)                               # 预配置约束集合
-    idf.insert_error(snr=15, verbose=1)                                             # 注入噪声
+    idf.constraints_mining(w=w, confidence=0.95, verbose=1)                        # 挖掘约束
+    # idf.constraints_mining(pre_mined=True, verbose=1)                               # 预配置约束集合
+    # idf.insert_error(snr=15, verbose=1)                                             # 注入噪声
 
     # 为HoloClean方法生成数据集和规则
     # idf.origin = idf.origin.round(2)
@@ -541,18 +541,18 @@ if __name__ == '__main__':
     # plt.savefig(PROJECT_ROOT + '/noise_color.png', bbox_inches='tight', pad_inches=0.02, dpi=300)
 
     # 绘制超图
-    t = array2window(idf.origin.values, win_size=w)[90]
-
-    hypergraph_df = pd.DataFrame(columns=['edge', 'vertex', 'weight'])
-    edge_num = 1
-    for stcd in idf.stcds:
-        degree = stcd.violation_degree(t)
-        if degree > 0:
-            for x_name in stcd.x_names:
-                hypergraph_df.loc[len(hypergraph_df)] = ['e{}'.format(edge_num), x_name[1], degree]
-            hypergraph_df.loc[len(hypergraph_df)] = ['e{}'.format(edge_num), stcd.y_name[1], degree]
-            edge_num += 1
-
-    H = hypernetx.Hypergraph(hypergraph_df, edge_col='edge', node_col='vertex', cell_weight_col='weight')
-    hypernetx.drawing.draw(H)
-    plt.show()
+    # t = array2window(idf.origin.values, win_size=w)[90]
+    #
+    # hypergraph_df = pd.DataFrame(columns=['edge', 'vertex', 'weight'])
+    # edge_num = 1
+    # for stcd in idf.stcds:
+    #     degree = stcd.violation_degree(t)
+    #     if degree > 0:
+    #         for x_name in stcd.x_names:
+    #             hypergraph_df.loc[len(hypergraph_df)] = ['e{}'.format(edge_num), x_name[1], degree]
+    #         hypergraph_df.loc[len(hypergraph_df)] = ['e{}'.format(edge_num), stcd.y_name[1], degree]
+    #         edge_num += 1
+    #
+    # H = hypernetx.Hypergraph(hypergraph_df, edge_col='edge', node_col='vertex', cell_weight_col='weight')
+    # hypernetx.drawing.draw(H)
+    # plt.show()

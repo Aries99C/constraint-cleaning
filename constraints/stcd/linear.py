@@ -131,6 +131,7 @@ class Linear:
             gamma = mean_loss
             +b * math.sqrt(math.log(1/(1-self.confidence))/(2*m))
             +b * math.sqrt(2*(len(x_vars)+1)*((math.log((math.e*m)/(2*(len(x_vars)+1))))/m))
+            print(mean_loss, b * math.sqrt(math.log(1/(1-self.confidence))/(2*m)), b * math.sqrt(2*(len(x_vars)+1)*((math.log((math.e*m)/(2*(len(x_vars)+1))))/m)))
             r_mine = Rule(x_names, y_var, func, -gamma, gamma, model, self.mts.dim, self.win_size)   # 解析规则
             if verbose > 0:     # 展示规则
                 print(r_mine)
