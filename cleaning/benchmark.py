@@ -458,14 +458,11 @@ def func_lp(mts, w=2, size=20, overlapping_ratio=0.2):
     modified = mts.modified.copy(deep=True)  # 拷贝数据
     is_modified = mts.isModified.copy(deep=True)  # 拷贝修复单元格信息
     time_cost = 0.  # 时间成本
-    success_cnt = 0
-    win_num = 0
 
     m = mts.dim  # 属性个数
 
     s = 0
     while s + size <= mts.len:
-        win_num += 1    # 记录清洗了多少个窗口
         # 获取大窗口内的数据
         win = min(size, mts.len - s)
         data = array2window(df2array(modified), win)[s]
@@ -501,71 +498,14 @@ def func_lp(mts, w=2, size=20, overlapping_ratio=0.2):
                     a_ub[i * m + idx], a_ub[i * m + idx + data.shape[0]] = -1, 1
                     A.append(a_ub)
                     b.append(b_ub)
-        # # 默认速度约束求解
+        # 默认速度约束求解
         res = linprog(c, A_ub=A, b_ub=b, bounds=bounds).x
-        # res = None
 
-        rules = sorted(mts.stcds, key=lambda r: r.ub - r.lb, reverse=True)[:20]
-        for rule in rules:
-            # 尝试添加约束前先保存上一次添加成功的系数
-            A_old = A.copy()
-            b_old = b.copy()
-            # 解析约束的参数
-            lb = rule.lb  # 约束下界
-            ub = rule.ub  # 约束上界
-            intercept = rule.func['intercept']  # 约束的模型截距
-            y_pos = rule.y_name[0] * m + rule.y_name[2]  # 约束f(X)->Y的Y在切片中的位置
-            # 对每个切片生成一组约束
-            for i in range(win - w):
-                # 获取切片
-                t = data[i * m: (i + w) * m]
-
-                # 根据y_pos将切片分为x和y
-                x = np.append(t[:y_pos], t[y_pos + 1:]) if y_pos > 0 else t[y_pos + 1:]
-                y = t[y_pos]
-                # 计算约束对应的系数A和b
-                # 将x'和y'都变成u和v：x'=x+(u-v), y'=y+(u-v);
-
-                # 上界对应约束 Σ a_i * x'_i + b - y' <= ub
-                a_ub = np.zeros(2 * data.shape[0])  # 前一半是u_i的系数，后一半是v_i的系数
-                b_ub = ub + y - intercept
-                a_ub[i * m: (i + w) * m] = rule.alpha
-                a_ub[i * m + data.shape[0]: (i + w) * m + data.shape[0]] = -rule.alpha
-                for j in range(len(t)):
-                    b_ub -= rule.alpha[j] * t[j]
-                A.append(a_ub)
-                b.append(b_ub)
-
-                # 下界
-                a_lb = np.zeros(2 * data.shape[0])  # 前一半是u_i的系数，后一半是v_i的系数
-                b_lb = -lb - y + intercept
-                a_lb[i * m: (i + w) * m] = -rule.alpha
-                a_lb[i * m + data.shape[0]: (i + w) * m + data.shape[0]] = rule.alpha
-                for j in range(len(t)):
-                    b_lb += rule.alpha[j] * t[j]
-                A.append(a_lb)
-                b.append(b_lb)
-
-            try_x = linprog(c, A_ub=A, b_ub=b, bounds=bounds).x
-            if try_x is not None:
-                success_cnt += 1
-                res = try_x
-            else:
-                print('添加约束{}失败，该约束的上下界为({},{})，变量X的系数为{}'.format(rule, rule.lb, rule.ub, rule.func['coef']))
-                A = A_old
-                b = b_old
-
-        end = time.perf_counter()
-        time_cost += end - start
-
-        if res is not None:
-            modified.values[s:s + win] = ((res[:data.shape[0]] - res[data.shape[0]:]) + data).reshape(win, m)
-        s += int((1 - overlapping_ratio) * size)
+        # 利用行约束填补参数 TODO
 
     # 根据差值判断数据是否被修复
     update_is_modified(mts, modified, is_modified)
 
-    # print('平均成功添加{:.2f}%的约束'.format(success_cnt / 20 / win_num * 100))
     return modified, is_modified, time_cost
 
 

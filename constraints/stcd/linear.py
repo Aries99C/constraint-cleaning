@@ -43,7 +43,6 @@ class Linear:
                 self.variables.append((t, col, i))   # 每个变量的形式为(时间戳，列名称，列索引)
 
     def mini_mine_sh(self, x, y, x_vars, y_var, max_x=1, verbose=0):
-        # TODO 规则的筛选需要新的策略
         # 在所有可能的掩码中学习规则
         x_possible = all_masks(len(x_vars), max_x)
         # 过滤相似度低的属性，也过滤速度约束
@@ -130,14 +129,11 @@ class Linear:
             mean_loss = np.mean(losses)                     # 平均误差
             b = max(losses)                                 # 最大误差
             # 旧公式导致置信度失效
-            # gamma = mean_loss
-            # +b * math.sqrt(math.log(1/(1-self.confidence))/(2*m))
-            # +b * math.sqrt(2*(len(x_vars)+1)*((math.log((math.e*m)/(2*(len(x_vars)+1))))/m))
-            # print(mean_loss, b * math.sqrt(math.log(1/(1-self.confidence))/(2*m)), b * math.sqrt(2*(len(x_vars)+1)*((math.log((math.e*m)/(2*(len(x_vars)+1))))/m)))
-            # r_mine = Rule(x_names, y_var, func, -gamma, gamma, model, self.mts.dim, self.win_size)   # 解析规则
-
-            # 新公式直接应用分位数
-            r_mine = Rule(x_names, y_var, func, mean_loss - 10 * np.std(losses), mean_loss + 10 * np.std(losses), model, self.mts.dim, self.win_size)   # 解析规则
+            gamma = mean_loss
+            +b * math.sqrt(math.log(1/(1-self.confidence))/(2*m))
+            +b * math.sqrt(2*(len(x_vars)+1)*((math.log((math.e*m)/(2*(len(x_vars)+1))))/m))
+            print(mean_loss, b * math.sqrt(math.log(1/(1-self.confidence))/(2*m)), b * math.sqrt(2*(len(x_vars)+1)*((math.log((math.e*m)/(2*(len(x_vars)+1))))/m)))
+            r_mine = Rule(x_names, y_var, func, -gamma, gamma, model, self.mts.dim, self.win_size)   # 解析规则
             if verbose > 0:     # 展示规则
                 print(r_mine)
             self.rules.append(r_mine)                                   # 添加规则

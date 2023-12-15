@@ -187,6 +187,9 @@ class MTS(object):
                 self.acc_constraints = mining_acc_constraints(self, alpha=3, verbose=verbose)
                 with open(PROJECT_ROOT + '/constraints/rules/{}_acc.txt'.format(self.dataset), 'wb') as f:
                     pickle.dump(self.acc_constraints, f)  # pickle序列化加速度约束
+            if 'row' in self.mining_constraints:    # 支持行约束
+                # TODO 实现行约束挖掘
+                pass
             if 'stcd' in self.mining_constraints:   # 支持时窗约束
                 self.stcds = mining_stcd(self, win_size=w, n_components=n_component, confidence=confidence, verbose=verbose)
                 with open(PROJECT_ROOT + '/constraints/rules/{}_stcd.txt'.format(self.dataset), 'wb') as f:
