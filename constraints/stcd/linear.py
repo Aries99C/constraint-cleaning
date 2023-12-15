@@ -126,15 +126,18 @@ class Linear:
                 'intercept': model.intercept_,                          # 函数的截距
             }
             # 根据置信度计算函数上下界
-            # TODO 上下界的计算方式需要重写
             losses = abs(model.predict(x_mine) - y_mine)    # 模型误差
             mean_loss = np.mean(losses)                     # 平均误差
             b = max(losses)                                 # 最大误差
-            gamma = mean_loss
-            +b * math.sqrt(math.log(1/(1-self.confidence))/(2*m))
-            +b * math.sqrt(2*(len(x_vars)+1)*((math.log((math.e*m)/(2*(len(x_vars)+1))))/m))
+            # 旧公式导致置信度失效
+            # gamma = mean_loss
+            # +b * math.sqrt(math.log(1/(1-self.confidence))/(2*m))
+            # +b * math.sqrt(2*(len(x_vars)+1)*((math.log((math.e*m)/(2*(len(x_vars)+1))))/m))
             # print(mean_loss, b * math.sqrt(math.log(1/(1-self.confidence))/(2*m)), b * math.sqrt(2*(len(x_vars)+1)*((math.log((math.e*m)/(2*(len(x_vars)+1))))/m)))
-            r_mine = Rule(x_names, y_var, func, -gamma, gamma, model, self.mts.dim, self.win_size)   # 解析规则
+            # r_mine = Rule(x_names, y_var, func, -gamma, gamma, model, self.mts.dim, self.win_size)   # 解析规则
+
+            # 新公式直接应用分位数
+            r_mine = Rule(x_names, y_var, func, mean_loss - 10 * np.std(losses), mean_loss + 10 * np.std(losses), model, self.mts.dim, self.win_size)   # 解析规则
             if verbose > 0:     # 展示规则
                 print(r_mine)
             self.rules.append(r_mine)                                   # 添加规则

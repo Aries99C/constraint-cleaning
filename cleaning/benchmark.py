@@ -459,11 +459,13 @@ def func_lp(mts, w=2, size=20, overlapping_ratio=0.2):
     is_modified = mts.isModified.copy(deep=True)  # 拷贝修复单元格信息
     time_cost = 0.  # 时间成本
     success_cnt = 0
+    win_num = 0
 
     m = mts.dim  # 属性个数
 
     s = 0
     while s + size <= mts.len:
+        win_num += 1    # 记录清洗了多少个窗口
         # 获取大窗口内的数据
         win = min(size, mts.len - s)
         data = array2window(df2array(modified), win)[s]
@@ -474,6 +476,7 @@ def func_lp(mts, w=2, size=20, overlapping_ratio=0.2):
         A = []
         b = []
         bounds = [(0, None) for j in range(2 * data.shape[0])]
+
         # 利用速度约束填补参数
         for idx, col in enumerate(modified.columns):
             # 获取当前列的速度约束上下界
@@ -498,11 +501,15 @@ def func_lp(mts, w=2, size=20, overlapping_ratio=0.2):
                     a_ub[i * m + idx], a_ub[i * m + idx + data.shape[0]] = -1, 1
                     A.append(a_ub)
                     b.append(b_ub)
-        # 默认速度约束求解
+        # # 默认速度约束求解
         res = linprog(c, A_ub=A, b_ub=b, bounds=bounds).x
-        rules = mts.stcds
-        # rules = random.sample(mts.stcds, 3)
+        # res = None
+
+        rules = sorted(mts.stcds, key=lambda r: r.ub - r.lb, reverse=True)[:20]
         for rule in rules:
+            # 尝试添加约束前先保存上一次添加成功的系数
+            A_old = A.copy()
+            b_old = b.copy()
             # 解析约束的参数
             lb = rule.lb  # 约束下界
             ub = rule.ub  # 约束上界
@@ -529,10 +536,24 @@ def func_lp(mts, w=2, size=20, overlapping_ratio=0.2):
                 A.append(a_ub)
                 b.append(b_ub)
 
-        try_x = linprog(c, A_ub=A, b_ub=b, bounds=bounds).x
-        if try_x is not None:
-            success_cnt += 1
-            res = try_x
+                # 下界
+                a_lb = np.zeros(2 * data.shape[0])  # 前一半是u_i的系数，后一半是v_i的系数
+                b_lb = -lb - y + intercept
+                a_lb[i * m: (i + w) * m] = -rule.alpha
+                a_lb[i * m + data.shape[0]: (i + w) * m + data.shape[0]] = rule.alpha
+                for j in range(len(t)):
+                    b_lb += rule.alpha[j] * t[j]
+                A.append(a_lb)
+                b.append(b_lb)
+
+            try_x = linprog(c, A_ub=A, b_ub=b, bounds=bounds).x
+            if try_x is not None:
+                success_cnt += 1
+                res = try_x
+            else:
+                print('添加约束{}失败，该约束的上下界为({},{})，变量X的系数为{}'.format(rule, rule.lb, rule.ub, rule.func['coef']))
+                A = A_old
+                b = b_old
 
         end = time.perf_counter()
         time_cost += end - start
@@ -544,7 +565,7 @@ def func_lp(mts, w=2, size=20, overlapping_ratio=0.2):
     # 根据差值判断数据是否被修复
     update_is_modified(mts, modified, is_modified)
 
-    # print('成功添加约束{}次'.format(success_cnt))
+    # print('平均成功添加{:.2f}%的约束'.format(success_cnt / 20 / win_num * 100))
     return modified, is_modified, time_cost
 
 

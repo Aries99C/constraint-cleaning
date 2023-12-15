@@ -298,6 +298,11 @@ class MTS(object):
                 self.modified.plot(subplots=True, figsize=(20, 40))
                 plt.show()
 
+        # 计算原始数据中的约束违反率：用来检查挖掘到的规则的质量
+        print('原始数据的约束违反率: {:.4g}'.format(violation_rate(self.clean, self.stcds, w)))
+        # 计算注入错误后的约束违反率
+        print('注入错误后的约束违反率: {:.4g}'.format(violation_rate(self.origin, self.stcds, w)))
+
         return insert_size, error_aver
 
     def delta_clean_origin(self):
@@ -313,14 +318,14 @@ if __name__ == '__main__':
     # 实验参数
     w = 2
 
-    idf = MTS('idf', 'timestamp', True, size=20000, verbose=1)                     # 读取数据集
+    idf = MTS('idf', 'timestamp', True, size=5000, verbose=1)                     # 读取数据集
     # idf = MTS('SWaT', 'Timestamp', False, size=2000, verbose=1)
     # idf = MTS('WADI', 'Row', False, size=2000, verbose=1)
     # idf = MTS('PUMP', 'time', False, size=5000, verbose=1)
 
-    idf.constraints_mining(w=w, confidence=0.95, verbose=1)                        # 挖掘约束
+    idf.constraints_mining(w=w, confidence=0.999, verbose=1)                        # 挖掘约束
     # idf.constraints_mining(pre_mined=True, verbose=1)                               # 预配置约束集合
-    # idf.insert_error(snr=15, verbose=1)                                             # 注入噪声
+    idf.insert_error(snr=15, verbose=1)                                             # 注入噪声
 
     # 为HoloClean方法生成数据集和规则
     # idf.origin = idf.origin.round(2)
@@ -352,6 +357,8 @@ if __name__ == '__main__':
     #         f.write('{};'.format(stcd.func['intercept']))
     #         f.write('{},{}\n'.format(stcd.lb, stcd.ub))
 
+    rules = sorted(idf.stcds, key=lambda r: r.ub - r.lb, reverse=True)[:20]
+
     # 修复
     # # 速度约束Local修复
     # speed_local_modified, speed_local_is_modified, speed_local_time = speed_local(idf, w=w)
@@ -363,13 +370,13 @@ if __name__ == '__main__':
     # print('修复后约束违反率: {:.4g}'.format(violation_rate(speed_local_modified, idf.stcds, w)))
     #
     # # 速度约束Global修复
-    # speed_global_modified, speed_global_is_modified, speed_global_time = speed_global(idf, w=w, x=10)
-    # print('{:=^80}'.format(' 全局速度约束修复数据集{} '.format(idf.dataset.upper())))
-    # print('修复用时: {:.4g}ms'.format(speed_global_time))
-    # print('修复值与正确值平均误差: {:.4g}'.format(delta(speed_global_modified, idf.clean)))
-    # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, speed_global_modified)))
-    # print('修复后约束违反程度: {:.4g}'.format(check_repair_violation(speed_global_modified, idf.stcds, w)))
-    # print('修复后约束违反率: {:.4g}'.format(violation_rate(speed_global_modified, idf.stcds, w)))
+    speed_global_modified, speed_global_is_modified, speed_global_time = speed_global(idf, w=w, x=10)
+    print('{:=^80}'.format(' 全局速度约束修复数据集{} '.format(idf.dataset.upper())))
+    print('修复用时: {:.4g}ms'.format(speed_global_time))
+    print('修复值与正确值平均误差: {:.4g}'.format(delta(speed_global_modified, idf.clean)))
+    print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, speed_global_modified)))
+    print('修复后约束违反程度: {:.4g}'.format(check_repair_violation(speed_global_modified, rules, w)))
+    print('修复后约束违反率: {:.4g}'.format(violation_rate(speed_global_modified, rules, w)))
     #
     # # 速度约束+加速度约束Local修复
     # acc_local_modified, acc_local_is_modified, acc_local_time = acc_local(idf)
@@ -417,13 +424,13 @@ if __name__ == '__main__':
     # print('修复后约束违反率: {:.4g}'.format(violation_rate(median_filter_modified, idf.stcds, w)))
     #
     # # func-LP修复
-    # func_lp_modified, func_lp_is_modified, func_lp_time = func_lp(idf, w=w)
-    # print('{:=^80}'.format(' func-LP修复数据集{} '.format(idf.dataset.upper())))
-    # print('修复用时: {:.4g}ms'.format(func_lp_time))
-    # print('修复值与正确值平均误差: {:.4g}'.format(delta(func_lp_modified, idf.clean)))
-    # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, func_lp_modified)))
-    # print('修复后约束违反程度: {:.4g}'.format(check_repair_violation(func_lp_modified, idf.stcds, w)))
-    # print('修复后约束违反率: {:.4g}'.format(violation_rate(func_lp_modified, idf.stcds, w)))
+    func_lp_modified, func_lp_is_modified, func_lp_time = func_lp(idf, w=w)
+    print('{:=^80}'.format(' func-LP修复数据集{} '.format(idf.dataset.upper())))
+    print('修复用时: {:.4g}ms'.format(func_lp_time))
+    print('修复值与正确值平均误差: {:.4g}'.format(delta(func_lp_modified, idf.clean)))
+    print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, func_lp_modified)))
+    print('修复后约束违反程度: {:.4g}'.format(check_repair_violation(func_lp_modified, rules, w)))
+    print('修复后约束违反率: {:.4g}'.format(violation_rate(func_lp_modified, rules, w)))
     #
     # # func-mvc修复sorted
     # func_mvc_modified, func_mvc_is_modified, func_mvc_time = func_mvc(idf, w=w, mvc='sorted')
@@ -434,9 +441,9 @@ if __name__ == '__main__':
     # print('修复后约束违反程度: {:.4g}'.format(check_repair_violation(func_mvc_modified, idf.stcds, w)))
     # print('修复后约束违反率: {:.4g}'.format(violation_rate(func_mvc_modified, idf.stcds, w)))
 
-    # idf.clean.plot(subplots=True, figsize=(10, 10))
-    # idf.origin.plot(subplots=True, figsize=(10, 10))
-    # func_lp_modified.plot(subplots=True, figsize=(10, 10))
+    idf.clean.plot(subplots=True, figsize=(10, 10))
+    idf.origin.plot(subplots=True, figsize=(10, 10))
+    func_lp_modified.plot(subplots=True, figsize=(10, 10))
     # func_mvc_modified.plot(subplots=True, figsize=(10, 10))
     # plt.show()
 
