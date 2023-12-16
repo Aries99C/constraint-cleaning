@@ -12,6 +12,8 @@ from dataset import DATASETS
 from constraints.speed.mining import mining_speed_constraints
 from constraints.acc.mining import mining_acc_constraints
 from constraints.stcd.mining import mining_stcd
+from constraints.row.mining import mining_row_constraints
+
 from constraints.fd.mining import read_from_TANE
 from constraints.rfd.Domino import domino_mining_rfd
 from constraints.rfd.CORDS import cords_mining_rfd
@@ -188,8 +190,7 @@ class MTS(object):
                 with open(PROJECT_ROOT + '/constraints/rules/{}_acc.txt'.format(self.dataset), 'wb') as f:
                     pickle.dump(self.acc_constraints, f)  # pickle序列化加速度约束
             if 'row' in self.mining_constraints:    # 支持行约束
-                # TODO 实现行约束挖掘
-                pass
+                self.row_constraints = mining_row_constraints(self, max_attr_num=3, verbose=verbose)
             if 'stcd' in self.mining_constraints:   # 支持时窗约束
                 self.stcds = mining_stcd(self, win_size=w, n_components=n_component, confidence=confidence, verbose=verbose)
                 with open(PROJECT_ROOT + '/constraints/rules/{}_stcd.txt'.format(self.dataset), 'wb') as f:

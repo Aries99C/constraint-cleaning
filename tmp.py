@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import hypernetx
 from sklearn.preprocessing import MinMaxScaler
+
+import utils
 from utils import project_root
 
 
@@ -57,6 +59,9 @@ if __name__ == '__main__':
     # df.plot(subplots=True, figsize=(10, 10))
     # plt.show()
 
-
+    df = pd.read_csv(utils.project_root() + '/data/IDF.csv', index_col='timestamp')
+    print(df)
+    df.drop(columns=['U3_HNA10CP107'], inplace=True)
+    df.to_csv(utils.project_root() + '/data/IDF.csv')
 
     pass
