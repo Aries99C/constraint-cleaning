@@ -72,7 +72,7 @@ def select_optimal_models(models_with_loss, m):
     return selected_models
 
 
-def mining_row_constraints(df, max_attr_num=3):
+def mining_row_constraints(df, max_attr_num=3, verbose=False):
     models_with_loss = train_models_and_evaluate(df, max_attr_num)
     m = df.shape[1]
     optimal_models = select_optimal_models(models_with_loss, m)
@@ -117,4 +117,3 @@ if __name__ == '__main__':
     constraints = mining_row_constraints(df, max_attr_num)
     for constraint_str, full_coef, rho_min, rho_max in constraints:
         print(constraint_str)
-

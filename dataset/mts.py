@@ -120,9 +120,17 @@ class MTS(object):
                     self.acc_constraints = pickle.load(f)
                     print('{:=^80}'.format(' 读取数据集{}上的加速度约束 '.format(self.dataset.upper())))
                     print('约束数量: {}'.format(self.dim))
-                    if verbose > 0:  # 输出加速度约束的形式
+                    if verbose > 0:     # 输出加速度约束的形式
                         for item in self.acc_constraints.items():
                             print('{:.2f} <= s({}) <= {:.2f}'.format(item[1][0], item[0], item[1][1]))
+            if 'row' in self.mining_constraints:    # 支持行约束
+                with open(PROJECT_ROOT + '/constraints/rules/{}_row.txt'.format(self.dataset), 'rb') as f:
+                    self.row_constraints = pickle.load(f)
+                    print('{:=^80}'.format(' 读取数据集{}上的行约束 '.format(self.dataset.upper())))
+                    print('约束数量: {}'.format(len(self.row_constraints)))
+                    if verbose > 0:     # 输出行约束的形式
+                        for row_constraint in self.row_constraints:
+                            print(row_constraint[0])    # 第一个元素是行约束的字符串形式
             if 'stcd' in self.mining_constraints:   # 支持时窗约束
                 with open(PROJECT_ROOT + '/constraints/rules/{}_stcd.txt'.format(self.dataset), 'rb') as f:
                     self.stcds = pickle.load(f)
@@ -191,6 +199,8 @@ class MTS(object):
                     pickle.dump(self.acc_constraints, f)  # pickle序列化加速度约束
             if 'row' in self.mining_constraints:    # 支持行约束
                 self.row_constraints = mining_row_constraints(self, max_attr_num=3, verbose=verbose)
+                with open(PROJECT_ROOT + '/constraints/rules/{}_row.txt'.format(self.dataset), 'wb') as f:
+                    pickle.dump(self.row_constraints, f)
             if 'stcd' in self.mining_constraints:   # 支持时窗约束
                 self.stcds = mining_stcd(self, win_size=w, n_components=n_component, confidence=confidence, verbose=verbose)
                 with open(PROJECT_ROOT + '/constraints/rules/{}_stcd.txt'.format(self.dataset), 'wb') as f:
@@ -322,12 +332,12 @@ if __name__ == '__main__':
     # 实验参数
     w = 2
 
-    idf = MTS('idf', 'timestamp', True, size=5000, verbose=1)                     # 读取数据集
+    idf = MTS('idf', 'timestamp', True, size=20000, verbose=1)                     # 读取数据集
     # idf = MTS('SWaT', 'Timestamp', False, size=2000, verbose=1)
     # idf = MTS('WADI', 'Row', False, size=2000, verbose=1)
     # idf = MTS('PUMP', 'time', False, size=5000, verbose=1)
 
-    idf.constraints_mining(w=w, confidence=0.999, verbose=1)                        # 挖掘约束
+    idf.constraints_mining(w=w, mining_constraints=['row'], confidence=0.999, verbose=1)                        # 挖掘约束
     # idf.constraints_mining(pre_mined=True, verbose=1)                               # 预配置约束集合
     idf.insert_error(snr=15, verbose=1)                                             # 注入噪声
 
@@ -361,7 +371,7 @@ if __name__ == '__main__':
     #         f.write('{};'.format(stcd.func['intercept']))
     #         f.write('{},{}\n'.format(stcd.lb, stcd.ub))
 
-    rules = sorted(idf.stcds, key=lambda r: r.ub - r.lb, reverse=True)[:20]
+    # rules = sorted(idf.stcds, key=lambda r: r.ub - r.lb, reverse=True)[:20]
 
     # 修复
     # # 速度约束Local修复
@@ -374,13 +384,13 @@ if __name__ == '__main__':
     # print('修复后约束违反率: {:.4g}'.format(violation_rate(speed_local_modified, idf.stcds, w)))
     #
     # # 速度约束Global修复
-    speed_global_modified, speed_global_is_modified, speed_global_time = speed_global(idf, w=w, x=10)
-    print('{:=^80}'.format(' 全局速度约束修复数据集{} '.format(idf.dataset.upper())))
-    print('修复用时: {:.4g}ms'.format(speed_global_time))
-    print('修复值与正确值平均误差: {:.4g}'.format(delta(speed_global_modified, idf.clean)))
-    print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, speed_global_modified)))
-    print('修复后约束违反程度: {:.4g}'.format(check_repair_violation(speed_global_modified, rules, w)))
-    print('修复后约束违反率: {:.4g}'.format(violation_rate(speed_global_modified, rules, w)))
+    # speed_global_modified, speed_global_is_modified, speed_global_time = speed_global(idf, w=w, x=10)
+    # print('{:=^80}'.format(' 全局速度约束修复数据集{} '.format(idf.dataset.upper())))
+    # print('修复用时: {:.4g}ms'.format(speed_global_time))
+    # print('修复值与正确值平均误差: {:.4g}'.format(delta(speed_global_modified, idf.clean)))
+    # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, speed_global_modified)))
+    # print('修复后约束违反程度: {:.4g}'.format(check_repair_violation(speed_global_modified, rules, w)))
+    # print('修复后约束违反率: {:.4g}'.format(violation_rate(speed_global_modified, rules, w)))
     #
     # # 速度约束+加速度约束Local修复
     # acc_local_modified, acc_local_is_modified, acc_local_time = acc_local(idf)
@@ -428,13 +438,13 @@ if __name__ == '__main__':
     # print('修复后约束违反率: {:.4g}'.format(violation_rate(median_filter_modified, idf.stcds, w)))
     #
     # # func-LP修复
-    func_lp_modified, func_lp_is_modified, func_lp_time = func_lp(idf, w=w)
-    print('{:=^80}'.format(' func-LP修复数据集{} '.format(idf.dataset.upper())))
-    print('修复用时: {:.4g}ms'.format(func_lp_time))
-    print('修复值与正确值平均误差: {:.4g}'.format(delta(func_lp_modified, idf.clean)))
-    print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, func_lp_modified)))
-    print('修复后约束违反程度: {:.4g}'.format(check_repair_violation(func_lp_modified, rules, w)))
-    print('修复后约束违反率: {:.4g}'.format(violation_rate(func_lp_modified, rules, w)))
+    # func_lp_modified, func_lp_is_modified, func_lp_time = func_lp(idf, w=w)
+    # print('{:=^80}'.format(' func-LP修复数据集{} '.format(idf.dataset.upper())))
+    # print('修复用时: {:.4g}ms'.format(func_lp_time))
+    # print('修复值与正确值平均误差: {:.4g}'.format(delta(func_lp_modified, idf.clean)))
+    # print('修复相对精度: {:.4g}'.format(raa(idf.origin, idf.clean, func_lp_modified)))
+    # print('修复后约束违反程度: {:.4g}'.format(check_repair_violation(func_lp_modified, rules, w)))
+    # print('修复后约束违反率: {:.4g}'.format(violation_rate(func_lp_modified, rules, w)))
     #
     # # func-mvc修复sorted
     # func_mvc_modified, func_mvc_is_modified, func_mvc_time = func_mvc(idf, w=w, mvc='sorted')
@@ -445,9 +455,9 @@ if __name__ == '__main__':
     # print('修复后约束违反程度: {:.4g}'.format(check_repair_violation(func_mvc_modified, idf.stcds, w)))
     # print('修复后约束违反率: {:.4g}'.format(violation_rate(func_mvc_modified, idf.stcds, w)))
 
-    idf.clean.plot(subplots=True, figsize=(10, 10))
-    idf.origin.plot(subplots=True, figsize=(10, 10))
-    func_lp_modified.plot(subplots=True, figsize=(10, 10))
+    # idf.clean.plot(subplots=True, figsize=(10, 10))
+    # idf.origin.plot(subplots=True, figsize=(10, 10))
+    # func_lp_modified.plot(subplots=True, figsize=(10, 10))
     # func_mvc_modified.plot(subplots=True, figsize=(10, 10))
     # plt.show()
 
